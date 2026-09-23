@@ -6,12 +6,20 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const presentation = presentationRepository.get(id);
     if (!presentation) throw notFound(id);
+    const stage = {
+      queued: "queued",
+      transcribing: "transcribing",
+      evaluating: "listening",
+      finalizing: "synthesizing",
+      complete: "completed",
+      failed: "failed",
+    } as const;
     return Response.json({
       presentationId: id,
-      status: presentation.status,
-      stage: presentation.stage,
-      progress: presentation.progress,
+      stage: stage[presentation.stage],
+      progress: presentation.progress / 100,
       error: presentation.error,
+      failedStage: presentation.error ? stage[presentation.stage] : undefined,
       updatedAt: presentation.updatedAt,
     });
   } catch (error) {

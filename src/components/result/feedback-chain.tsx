@@ -87,7 +87,7 @@ export function FeedbackChain({
       <Step index={4} label="이렇게 고쳐보세요" last>
         <p className="text-on-surface">{section.improvement.suggestion}</p>
         {section.improvement.rewrite && (
-          <p className="rounded-lg border-l-2 border-secondary bg-secondary-fixed/25 px-3 py-2 text-on-surface sm:px-4 sm:py-3">
+          <p className="rounded-lg bg-secondary-fixed/25 px-3 py-2 text-on-surface shadow-sm sm:px-4 sm:py-3">
             <span className="mb-1 block text-label-sm text-on-secondary-fixed-variant">바꿔 말하기 예시</span>
             {section.improvement.rewrite}
           </p>

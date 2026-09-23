@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { ApiError, errorResponse } from "@/lib/presentations/errors";
 import { presentationRepository, toPresentationResponse } from "@/lib/presentations/store";
 import {
@@ -65,7 +64,8 @@ export async function POST(request: Request) {
       audio: { filename: audioEntry.name || "recording", mimeType, sizeBytes: audioEntry.size },
     };
     const record = presentationRepository.create(input);
-    return Response.json({ presentation: toPresentationResponse(record) }, { status: 201 });
+    const presentation = toPresentationResponse(record);
+    return Response.json({ presentationId: presentation.id, createdAt: presentation.createdAt, presentation }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
   }

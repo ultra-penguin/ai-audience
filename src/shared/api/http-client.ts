@@ -39,15 +39,15 @@ export function createHttpClient(baseUrl: string): ApiClient {
       const form = new FormData();
       const ext = mimeType.includes("mp4") ? "m4a" : mimeType.includes("ogg") ? "ogg" : "webm";
       form.append("audio", audio, `presentation.${ext}`);
-      form.append("durationSec", String(Math.round(durationSec)));
+      form.append("durationSeconds", String(Math.round(durationSec)));
       if (title) form.append("title", title);
       return request(base, "/presentations", CreatePresentationResponseSchema, { method: "POST", body: form });
     },
     startAnalysis(presentationId) {
-      return request(base, `/presentations/${id(presentationId)}/analysis`, AnalysisStatusSchema, { method: "POST" });
+      return request(base, `/presentations/${id(presentationId)}/analyze`, AnalysisStatusSchema, { method: "POST" });
     },
     getAnalysisStatus(presentationId) {
-      return request(base, `/presentations/${id(presentationId)}/analysis`, AnalysisStatusSchema, {
+      return request(base, `/presentations/${id(presentationId)}/status`, AnalysisStatusSchema, {
         cache: "no-store",
       });
     },

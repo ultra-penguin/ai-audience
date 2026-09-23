@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isApiError, type AnalysisStage, type CreatePresentationRequest } from "@/shared/api";
+import { createMockClient } from "@/mocks/mock-client";
 
 export const presentationKeys = {
   all: ["presentations"] as const,
@@ -11,6 +12,9 @@ export const presentationKeys = {
 
 const TERMINAL_STAGES: AnalysisStage[] = ["completed", "failed"];
 const POLL_INTERVAL_MS = 1500;
+const DEMO_IDS = new Set(["sample", "demo-empty", "demo-failed"]);
+const demoApi = createMockClient();
+const clientFor = (id: string) => (DEMO_IDS.has(id) ? demoApi : api);
 
 /** Upload the recording, then kick off analysis. Resolves with the presentation id. */
 export function useSubmitPresentation() {
@@ -28,7 +32,7 @@ export function useSubmitPresentation() {
 export function useRetryAnalysis(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.startAnalysis(id),
+    mutationFn: () => clientFor(id).startAnalysis(id),
     onSuccess: (status) => queryClient.setQueryData(presentationKeys.status(id), status),
   });
 }
@@ -36,7 +40,7 @@ export function useRetryAnalysis(id: string) {
 export function useAnalysisStatus(id: string) {
   return useQuery({
     queryKey: presentationKeys.status(id),
-    queryFn: () => api.getAnalysisStatus(id),
+    queryFn: () => clientFor(id).getAnalysisStatus(id),
     refetchInterval: (query) => {
       const stage = query.state.data?.stage;
       if (query.state.error) return false;
@@ -49,7 +53,7 @@ export function useAnalysisStatus(id: string) {
 export function useAnalysisResult(id: string) {
   return useQuery({
     queryKey: presentationKeys.result(id),
-    queryFn: () => api.getResult(id),
+    queryFn: () => clientFor(id).getResult(id),
     staleTime: Infinity,
     retry: (count, error) => !(isApiError(error) && error.code === "not_found") && count < 2,
   });

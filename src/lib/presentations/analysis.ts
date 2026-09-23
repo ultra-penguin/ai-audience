@@ -145,7 +145,8 @@ export function startAnalysis(id: string): void {
   if (!record) throw new ApiError(404, "presentation_not_found", `Presentation '${id}' was not found.`);
   if (record.status === "analyzing") throw new ApiError(409, "analysis_in_progress", "Analysis is already in progress.");
   if (record.status === "complete") throw new ApiError(409, "analysis_already_complete", "Analysis has already completed.");
-  if (record.status === "failed") throw new ApiError(409, "analysis_failed", "This analysis failed; create a new presentation to retry.");
+  // A failed analysis is retryable in the MVP. Keep the same presentation and
+  // reset its pipeline so the frontend's retry action is a real recovery path.
   presentationRepository.update(id, { status: "analyzing", stage: "queued", progress: 5, error: null });
   void runAnalysis(id);
 }

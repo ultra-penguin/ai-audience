@@ -39,7 +39,7 @@ export function ResultView({ id }: { id: string }) {
           >
             관중이 발표를 듣는 중이에요. 분석이 끝나면 이 화면에서 결과를 볼 수 있어요.
           </Notice>
-        ) : code === "not_found" ? (
+        ) : code === "not_found" || code === "presentation_not_found" ? (
           <Notice
             tone="error"
             title="결과를 찾을 수 없어요"

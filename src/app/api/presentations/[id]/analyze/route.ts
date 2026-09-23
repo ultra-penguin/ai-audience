@@ -10,10 +10,9 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     return Response.json(
       {
         presentationId: id,
-        status: presentation.status,
-        stage: presentation.stage,
-        progress: presentation.progress,
-        message: "Analysis started. Poll the status endpoint until it is complete.",
+        stage: presentation.stage === "complete" ? "completed" : "queued",
+        progress: presentation.progress / 100,
+        updatedAt: presentation.updatedAt,
       },
       { status: 202 },
     );

@@ -8,8 +8,8 @@ import { z } from "zod";
  * backend to honour this file. Endpoints (relative to NEXT_PUBLIC_API_BASE_URL):
  *
  *   POST /presentations                         multipart: audio, durationSec, title?  → CreatePresentationResponse
- *   POST /presentations/{id}/analysis           (no body)                              → AnalysisStatus
- *   GET  /presentations/{id}/analysis           (status polling)                       → AnalysisStatus
+ *   POST /presentations/{id}/analyze            (no body)                              → AnalysisStatus
+ *   GET  /presentations/{id}/status             (status polling)                       → AnalysisStatus
  *   GET  /presentations/{id}/result                                                    → AnalysisResult
  *
  * Errors: non-2xx with body ApiErrorBody.
@@ -21,11 +21,25 @@ import { z } from "zod";
 
 export const ApiErrorCodeSchema = z.enum([
   "not_found",
+  "presentation_not_found",
   "invalid_audio",
+  "unsupported_media_type",
+  "invalid_multipart",
+  "audio_required",
+  "empty_audio",
+  "audio_too_large",
+  "unsupported_audio_type",
+  "invalid_title",
+  "invalid_duration",
+  "transcript_too_long",
   "audio_too_short",
   "upload_failed",
   "analysis_failed",
+  "analysis_in_progress",
+  "analysis_already_complete",
   "result_not_ready",
+  "invalid_request",
+  "internal_error",
   "network_error",
   "unknown",
 ]);

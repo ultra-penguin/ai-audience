@@ -1,4 +1,5 @@
 import { ApiError, errorResponse, notFound } from "@/lib/presentations/errors";
+import { toFrontendAnalysisResult } from "@/lib/presentations/frontend-result";
 import { presentationRepository } from "@/lib/presentations/store";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -12,7 +13,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     if (presentation.status !== "complete" || !presentation.result) {
       throw new ApiError(409, "result_not_ready", "Analysis is not complete; poll the status endpoint first.", { status: presentation.status, stage: presentation.stage });
     }
-    return Response.json({ presentationId: id, status: presentation.status, result: presentation.result });
+    return Response.json(toFrontendAnalysisResult(presentation, presentation.result));
   } catch (error) {
     return errorResponse(error);
   }
