@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { AnalysisResult, AnalysisStage, PresentationInput, PresentationResponse, PresentationStatus } from "./schemas";
 
-export type StoredPresentation = PresentationInput & {
+export type PresentationCreateInput = PresentationInput & {
+  /** Retained only in the server-side repository for STT; never included in API responses. */
+  audioBytes?: Uint8Array;
+};
+
+export type StoredPresentation = PresentationCreateInput & {
   id: string;
   status: PresentationStatus;
   stage: AnalysisStage;
@@ -13,16 +18,19 @@ export type StoredPresentation = PresentationInput & {
 };
 
 export interface PresentationRepository {
-  create(input: PresentationInput): StoredPresentation;
+  create(input: PresentationCreateInput): StoredPresentation;
   get(id: string): StoredPresentation | undefined;
-  update(id: string, patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "result" | "error" | "updatedAt">>): StoredPresentation | undefined;
+  update(
+    id: string,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "result" | "error" | "updatedAt" | "transcript">>,
+  ): StoredPresentation | undefined;
   clear(): void;
 }
 
 export class InMemoryPresentationRepository implements PresentationRepository {
   private readonly records = new Map<string, StoredPresentation>();
 
-  create(input: PresentationInput): StoredPresentation {
+  create(input: PresentationCreateInput): StoredPresentation {
     const now = new Date().toISOString();
     const record: StoredPresentation = {
       ...input,
@@ -45,7 +53,7 @@ export class InMemoryPresentationRepository implements PresentationRepository {
 
   update(
     id: string,
-    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "result" | "error" | "updatedAt">>,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "result" | "error" | "updatedAt" | "transcript">>,
   ): StoredPresentation | undefined {
     const record = this.records.get(id);
     if (!record) return undefined;

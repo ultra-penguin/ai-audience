@@ -57,11 +57,12 @@ export async function POST(request: Request) {
       throw new ApiError(400, "transcript_too_long", `transcript must be ${MAX_TRANSCRIPT_CHARS} characters or shorter.`);
     }
 
-    const input: PresentationInput = {
+    const input: PresentationInput & { audioBytes: Uint8Array } = {
       title,
       durationSeconds: parseOptionalDuration(asString(form.get("durationSeconds"))),
       transcript,
       audio: { filename: audioEntry.name || "recording", mimeType, sizeBytes: audioEntry.size },
+      audioBytes: new Uint8Array(await audioEntry.arrayBuffer()),
     };
     const record = presentationRepository.create(input);
     const presentation = toPresentationResponse(record);

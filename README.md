@@ -33,7 +33,16 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 
 Errors use `{ "error": { "code": "...", "message": "...", "details": ... } }` where details are present.
 
-The default `PresentationAnalysisProvider` is an explicitly labelled mock provider. Replace it with STT/persona adapters that return the Zod-validated `AnalysisResult` shape for production AI analysis.
+### Analysis providers
+
+The backend keeps `MockPresentationAnalysisProvider` as the development fallback. It uses the mock provider whenever either `STT_API_KEY` or `LLM_API_KEY` is missing, so local development never needs credentials. With both keys configured, the default `openai-compatible` providers use native `fetch` for Korean-capable speech-to-text and JSON persona analysis; `STT_PROVIDER` and `LLM_PROVIDER` currently accept `openai` or `openai-compatible`. `STT_BASE_URL`, `LLM_BASE_URL`, `STT_MODEL`, `LLM_MODEL`, and `ANALYSIS_TIMEOUT_MS` are optional server-only overrides.
+
+Required server-only variables for real analysis:
+
+- `STT_PROVIDER`, `STT_API_KEY`
+- `LLM_PROVIDER`, `LLM_API_KEY`
+
+The upload repository retains audio bytes in memory for STT while exposing only safe audio metadata through API responses. A restart discards bytes and all presentation data, consistent with the MVP storage limitation. Real analysis always uses exactly three fixed perspectives: 비전공 관중, 일반 관중, 전문가 관중; each raw LLM response is Zod-validated and malformed JSON is retried once.
 
 ## Storage note
 
