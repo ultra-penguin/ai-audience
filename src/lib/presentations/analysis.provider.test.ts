@@ -33,6 +33,7 @@ describe("real analysis provider", () => {
   it("selects mock without both server-side keys and provider with both keys", () => {
     expect(createAnalysisProviderFromEnv({})).toBeInstanceOf(MockPresentationAnalysisProvider);
     expect(createAnalysisProviderFromEnv({ STT_API_KEY: "stt-secret", LLM_API_KEY: "llm-secret" })).toBeInstanceOf(ProviderPresentationAnalysisProvider);
+    expect(createAnalysisProviderFromEnv({ GROQ_API_KEY: "groq-secret", STT_PROVIDER: "groq", LLM_PROVIDER: "groq" })).toBeInstanceOf(ProviderPresentationAnalysisProvider);
   });
 
   it("runs exactly three persona calls concurrently and validates their JSON", async () => {

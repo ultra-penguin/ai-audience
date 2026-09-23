@@ -35,14 +35,14 @@ Errors use `{ "error": { "code": "...", "message": "...", "details": ... } }` wh
 
 ### Analysis providers
 
-The backend keeps `MockPresentationAnalysisProvider` as the development fallback. It uses the mock provider whenever either `STT_API_KEY` or `LLM_API_KEY` is missing, so local development never needs credentials. With both keys configured, the default `openai-compatible` providers use native `fetch` for Korean-capable speech-to-text and JSON persona analysis; `STT_PROVIDER` and `LLM_PROVIDER` currently accept `openai` or `openai-compatible`. `STT_BASE_URL`, `LLM_BASE_URL`, `STT_MODEL`, `LLM_MODEL`, and `ANALYSIS_TIMEOUT_MS` are optional server-only overrides.
+The backend keeps `MockPresentationAnalysisProvider` as the development fallback. By default Phase 2 is configured for Groq's OpenAI-compatible API: `openai/gpt-oss-120b` for persona analysis and multilingual `whisper-large-v3-turbo` for speech-to-text. Set one server-only `GROQ_API_KEY` to enable both; if it is missing, local development safely stays in mock mode. `STT_PROVIDER` and `LLM_PROVIDER` accept `groq`, `openai`, or `openai-compatible`. `STT_BASE_URL`, `LLM_BASE_URL`, `STT_MODEL`, `LLM_MODEL`, `LLM_REASONING_EFFORT`, and `ANALYSIS_TIMEOUT_MS` are optional server-only overrides.
 
 Required server-only variables for real analysis:
 
-- `STT_PROVIDER`, `STT_API_KEY`
-- `LLM_PROVIDER`, `LLM_API_KEY`
+- `STT_PROVIDER=groq`, `LLM_PROVIDER=groq`
+- `GROQ_API_KEY` (or separate `STT_API_KEY` and `LLM_API_KEY`)
 
-The upload repository retains audio bytes in memory for STT while exposing only safe audio metadata through API responses. A restart discards bytes and all presentation data, consistent with the MVP storage limitation. Real analysis always uses exactly three fixed perspectives: 비전공 관중, 일반 관중, 전문가 관중; each raw LLM response is Zod-validated and malformed JSON is retried once.
+The upload repository retains audio bytes in memory for STT while exposing only safe audio metadata through API responses. A restart discards bytes and all presentation data, consistent with the MVP storage limitation. Real analysis always uses exactly three fixed perspectives: 비전공 관중, 일반 관중, 전문가 관중; each raw LLM response is Zod-validated and malformed JSON is retried once. Groq documents `whisper-large-v3-turbo` as multilingual and exposes a free-tier upload limit, but its published price is $0.04/hour; it is not an unlimited zero-cost model.
 
 ## Storage note
 

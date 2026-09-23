@@ -110,7 +110,7 @@ export class OpenAICompatibleSpeechToTextProvider implements SpeechToTextProvide
 export class OpenAICompatibleLanguageModelProvider implements JsonLanguageModelProvider {
   constructor(
     private readonly apiKey: string,
-    private readonly options: { endpoint?: string; model?: string; timeoutMs: number },
+    private readonly options: { endpoint?: string; model?: string; reasoningEffort?: string; timeoutMs: number },
   ) {}
 
   async completeJson(input: JsonLanguageModelRequest): Promise<string> {
@@ -122,6 +122,7 @@ export class OpenAICompatibleLanguageModelProvider implements JsonLanguageModelP
         body: JSON.stringify({
           model: this.options.model ?? DEFAULT_LLM_MODEL,
           temperature: 0.2,
+          ...(this.options.reasoningEffort ? { reasoning_effort: this.options.reasoningEffort } : {}),
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: input.system },
