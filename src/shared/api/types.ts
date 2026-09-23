@@ -12,7 +12,8 @@ import { z } from "zod";
  *   GET  /presentations/{id}/status             (status polling)                       → AnalysisStatus
  *   GET  /presentations/{id}/result                                                    → AnalysisResult
  *
- * Errors: non-2xx with body ApiErrorBody.
+ * Errors: non-2xx with body `{ error: ApiErrorBody }` (a bare ApiErrorBody is
+ * also accepted). Unknown codes are normalised to "unknown" by the client.
  */
 
 // ---------------------------------------------------------------------------
@@ -88,9 +89,10 @@ export const AnalysisStatusSchema = z.object({
   stage: AnalysisStageSchema,
   /** Optional 0–1 progress within the whole pipeline; UI must not depend on it. */
   progress: z.number().min(0).max(1).optional(),
-  error: ApiErrorBodySchema.optional(),
+  /** The backend may send `null` or a provider-specific code; the UI only shows a safe message for it. */
+  error: z.object({ code: z.string(), message: z.string() }).nullish(),
   /** Stage that was running when the pipeline failed (only when stage === "failed"). */
-  failedStage: AnalysisStageSchema.optional(),
+  failedStage: AnalysisStageSchema.nullish(),
   updatedAt: z.string(),
 });
 export type AnalysisStatus = z.infer<typeof AnalysisStatusSchema>;
@@ -192,6 +194,21 @@ export const ResultSummarySchema = z.object({
 });
 export type ResultSummary = z.infer<typeof ResultSummarySchema>;
 
+export const TranscriptSegmentSchema = z.object({
+  id: z.string(),
+  startSec: z.number().min(0),
+  endSec: z.number().min(0),
+  text: z.string(),
+});
+export type TranscriptSegment = z.infer<typeof TranscriptSegmentSchema>;
+
+/** Full speech-to-text output. Optional so older payloads and samples stay valid. */
+export const TranscriptSchema = z.object({
+  text: z.string(),
+  segments: z.array(TranscriptSegmentSchema),
+});
+export type Transcript = z.infer<typeof TranscriptSchema>;
+
 export const AnalysisResultSchema = z.object({
   presentationId: z.string(),
   title: z.string(),
@@ -205,5 +222,6 @@ export const AnalysisResultSchema = z.object({
   difficultSections: z.array(DifficultSectionSchema),
   missingExplanations: z.array(MissingExplanationSchema),
   exampleSuggestions: z.array(ExampleSuggestionSchema),
+  transcript: TranscriptSchema.optional(),
 });
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;

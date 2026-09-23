@@ -1,11 +1,26 @@
-import type { z } from "zod";
-import { ApiError, type ApiClient } from "./client";
+import { z } from "zod";
+import { ApiError, safeErrorMessage, type ApiClient } from "./client";
 import {
   AnalysisResultSchema,
   AnalysisStatusSchema,
-  ApiErrorBodySchema,
+  ApiErrorCodeSchema,
   CreatePresentationResponseSchema,
+  type ApiErrorCode,
 } from "./types";
+
+const ErrorEnvelopeSchema = z.union([
+  z.object({ error: z.object({ code: z.string() }) }).transform((b) => b.error.code),
+  z.object({ code: z.string() }).transform((b) => b.code),
+]);
+
+/** Map any non-2xx response to an ApiError with a known code and a safe, user-facing message. */
+function toApiError(status: number, body: unknown): ApiError {
+  const rawCode = ErrorEnvelopeSchema.safeParse(body);
+  const known = rawCode.success ? ApiErrorCodeSchema.safeParse(rawCode.data) : undefined;
+  const code: ApiErrorCode = known?.success ? known.data : status === 404 ? "not_found" : "unknown";
+  const message = code === "unknown" ? `요청이 실패했어요 (${status}).` : safeErrorMessage(code);
+  return new ApiError(code, message, status);
+}
 
 async function request<T>(baseUrl: string, path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -17,11 +32,7 @@ async function request<T>(baseUrl: string, path: string, schema: z.ZodType<T>, i
 
   const body: unknown = await res.json().catch(() => null);
 
-  if (!res.ok) {
-    const parsed = ApiErrorBodySchema.safeParse(body);
-    if (parsed.success) throw new ApiError(parsed.data.code, parsed.data.message, res.status);
-    throw new ApiError(res.status === 404 ? "not_found" : "unknown", `요청이 실패했어요 (${res.status}).`, res.status);
-  }
+  if (!res.ok) throw toApiError(res.status, body);
 
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

@@ -117,5 +117,14 @@ export function toFrontendAnalysisResult(
     difficultSections,
     missingExplanations,
     exampleSuggestions,
+    transcript: {
+      text: result.transcript.text,
+      segments: result.transcript.segments.map((segment) => ({
+        id: segment.id,
+        startSec: segment.startSeconds,
+        endSec: segment.endSeconds,
+        text: segment.text,
+      })),
+    },
   });
 }

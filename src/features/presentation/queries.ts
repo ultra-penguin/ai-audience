@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isApiError, type AnalysisStage, type CreatePresentationRequest } from "@/shared/api";
+import { api, shouldRetryQuery, type AnalysisStage, type CreatePresentationRequest } from "@/shared/api";
 import { createMockClient } from "@/mocks/mock-client";
 
 export const presentationKeys = {
@@ -46,7 +46,7 @@ export function useAnalysisStatus(id: string) {
       if (query.state.error) return false;
       return stage && TERMINAL_STAGES.includes(stage) ? false : POLL_INTERVAL_MS;
     },
-    retry: (count, error) => !(isApiError(error) && error.code === "not_found") && count < 2,
+    retry: shouldRetryQuery,
   });
 }
 
@@ -55,6 +55,6 @@ export function useAnalysisResult(id: string) {
     queryKey: presentationKeys.result(id),
     queryFn: () => clientFor(id).getResult(id),
     staleTime: Infinity,
-    retry: (count, error) => !(isApiError(error) && error.code === "not_found") && count < 2,
+    retry: shouldRetryQuery,
   });
 }

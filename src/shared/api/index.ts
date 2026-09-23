@@ -14,6 +14,6 @@ export const isMockApi = mode === "mock" || !baseUrl;
 
 export const api: ApiClient = isMockApi ? createMockClient() : createHttpClient(baseUrl);
 
-export { ApiError, isApiError } from "./client";
+export { ApiError, isApiError, isNotFoundError, safeErrorMessage, shouldRetryQuery } from "./client";
 export type { ApiClient } from "./client";
 export * from "./types";

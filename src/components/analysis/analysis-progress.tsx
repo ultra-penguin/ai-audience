@@ -9,7 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
-import { isApiError, type AnalysisStage } from "@/shared/api";
+import { isNotFoundError, safeErrorMessage, type AnalysisStage } from "@/shared/api";
 import { cn } from "@/lib/utils";
 
 const PIPELINE: { stage: AnalysisStage; label: string; detail: string }[] = [
@@ -40,7 +40,7 @@ export function AnalysisProgress({ id }: { id: string }) {
   }, [completed, id, router]);
 
   if (status.isError) {
-    const notFound = isApiError(status.error) && status.error.code === "not_found";
+    const notFound = isNotFoundError(status.error);
     return (
       <Shell>
         <Notice
@@ -136,7 +136,7 @@ export function AnalysisProgress({ id }: { id: string }) {
               </>
             }
           >
-            {status.data?.error?.message ?? "일시적인 문제일 수 있어요."} 녹음은 서버에 남아 있어서 다시 올릴 필요 없어요.
+            {status.data?.error ? safeErrorMessage(status.data.error.code) : "일시적인 문제일 수 있어요."} 녹음은 서버에 남아 있어서 다시 올릴 필요 없어요.
             {retry.isError && " 재시도 요청도 실패했어요. 잠시 후 다시 눌러 주세요."}
           </Notice>
         )}

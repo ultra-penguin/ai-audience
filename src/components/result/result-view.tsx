@@ -8,13 +8,14 @@ import { useResultUiStore } from "@/features/result/result-ui-store";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isApiError } from "@/shared/api";
+import { isApiError, isNotFoundError } from "@/shared/api";
 import { formatDurationLong } from "@/lib/utils";
 import { DifficultSections } from "./difficult-sections";
 import { PersonaFeedbackGrid } from "./persona-feedback-grid";
 import { PriorityFix } from "./priority-fix";
 import { SuggestionsSection } from "./suggestions-section";
 import { SummarySection } from "./summary-section";
+import { TranscriptSection } from "./transcript-section";
 
 export function ResultView({ id }: { id: string }) {
   const query = useAnalysisResult(id);
@@ -39,7 +40,19 @@ export function ResultView({ id }: { id: string }) {
           >
             관중이 발표를 듣는 중이에요. 분석이 끝나면 이 화면에서 결과를 볼 수 있어요.
           </Notice>
-        ) : code === "not_found" || code === "presentation_not_found" ? (
+        ) : code === "analysis_failed" ? (
+          <Notice
+            tone="error"
+            title="분석을 마치지 못했어요"
+            actions={
+              <Link href={`/analyzing/${encodeURIComponent(id)}`} className={buttonVariants({ size: "sm" })}>
+                다시 분석하러 가기
+              </Link>
+            }
+          >
+            녹음은 서버에 남아 있어요. 분석 화면에서 다시 시도해 주세요.
+          </Notice>
+        ) : isNotFoundError(query.error) ? (
           <Notice
             tone="error"
             title="결과를 찾을 수 없어요"
@@ -92,6 +105,7 @@ export function ResultView({ id }: { id: string }) {
       <PersonaFeedbackGrid result={result} />
       <DifficultSections result={result} />
       <SuggestionsSection result={result} />
+      <TranscriptSection result={result} />
 
       <section aria-labelledby="next-title" className="flex flex-col items-start gap-4 rounded-xl bg-surface-container-low p-6 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
