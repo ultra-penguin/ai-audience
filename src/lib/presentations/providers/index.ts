@@ -30,6 +30,7 @@ export type ProviderEnv = {
   STT_BASE_URL?: string;
   LLM_BASE_URL?: string;
   STT_MODEL?: string;
+  STT_LANGUAGE?: string;
   LLM_MODEL?: string;
   LLM_REASONING_EFFORT?: string;
   ANALYSIS_TIMEOUT_MS?: string;
@@ -67,6 +68,7 @@ export function createConfiguredProviders(env: ProviderEnv = process.env): Confi
     speechToText: new OpenAICompatibleSpeechToTextProvider(sttKey, {
       endpoint: env.STT_BASE_URL?.trim() || (sttProvider === "groq" ? "https://api.groq.com/openai/v1/audio/transcriptions" : undefined),
       model: env.STT_MODEL?.trim() || (sttProvider === "groq" ? "whisper-large-v3-turbo" : undefined),
+      language: env.STT_LANGUAGE?.trim() || (sttProvider === "groq" ? "ko" : undefined),
       timeoutMs,
     }),
     languageModel: new OpenAICompatibleLanguageModelProvider(llmKey, {

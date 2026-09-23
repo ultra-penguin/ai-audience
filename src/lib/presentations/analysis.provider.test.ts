@@ -68,7 +68,7 @@ describe("real analysis provider", () => {
     const calls = new Map<string, number>();
     const languageModel: JsonLanguageModelProvider = {
       completeJson: async (input) => {
-        const persona = input.system.match(/You are ([^,]+)/)?.[1] ?? "unknown";
+        const persona = input.system.match(/당신은 (.+?)입니다\./)?.[1] ?? "unknown";
         const count = (calls.get(persona) ?? 0) + 1;
         calls.set(persona, count);
         return count === 1 ? "not json" : personaResponse;

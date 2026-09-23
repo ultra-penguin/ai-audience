@@ -67,7 +67,7 @@ function bytesToBlob(audio: Uint8Array, metadata: AudioMetadata): Blob {
 export class OpenAICompatibleSpeechToTextProvider implements SpeechToTextProvider {
   constructor(
     private readonly apiKey: string,
-    private readonly options: { endpoint?: string; model?: string; timeoutMs: number },
+    private readonly options: { endpoint?: string; model?: string; language?: string; timeoutMs: number },
   ) {}
 
   async transcribe(input: { audio: Uint8Array; metadata: AudioMetadata }): Promise<SpeechToTextResult> {
@@ -79,6 +79,7 @@ export class OpenAICompatibleSpeechToTextProvider implements SpeechToTextProvide
     form.append("file", bytesToBlob(input.audio, input.metadata), input.metadata.filename || "presentation-audio");
     form.append("model", this.options.model ?? DEFAULT_STT_MODEL);
     form.append("response_format", "verbose_json");
+    if (this.options.language) form.append("language", this.options.language);
     const response = await fetchWithTimeout(
       this.options.endpoint ?? DEFAULT_STT_URL,
       { method: "POST", headers: { Authorization: `Bearer ${this.apiKey}` }, body: form },

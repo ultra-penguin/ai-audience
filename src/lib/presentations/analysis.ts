@@ -91,7 +91,8 @@ const llmPersonaResponseSchema = z.object({
 }).strict();
 type LlmPersonaResponse = z.infer<typeof llmPersonaResponseSchema>;
 
-const JSON_INSTRUCTIONS = `Return only one valid JSON object with this exact shape. Do not use markdown fences or extra text:
+const JSON_INSTRUCTIONS = `반드시 한국어로만 답하세요. JSON의 모든 문자열 값(reaction, blockers, questions, missingExplanations, improvements의 title/problem/action/example)은 자연스러운 한국어여야 합니다. 영어, 한국어와 영어의 혼용, 영어 문장, 로마자 설명을 사용하지 마세요. 고유명사나 제품명처럼 번역할 수 없는 용어만 원문 표기를 허용합니다. Transcript에 영어가 포함되어 있어도 평가와 개선안은 한국어로 작성하세요.
+Return only one valid JSON object with this exact shape. Do not use markdown fences or extra text:
 {"comprehensionScore":0,"attentionScore":0,"reaction":"string","blockers":["string"],"questions":["string"],"focusSegmentIndexes":[0],"missingExplanations":["string"],"improvements":[{"title":"string","problem":"string","action":"string","example":"string","segmentIndex":0}]}
 Scores are integers from 0 to 100. focusSegmentIndexes and segmentIndex refer to the numbered transcript sentences, starting at 0. Keep every observation grounded in the transcript.`;
 
@@ -101,8 +102,8 @@ function parseJsonContent(raw: string): unknown {
 }
 
 async function callPersonaModel(model: JsonLanguageModelProvider, persona: FixedPersona, transcript: string): Promise<LlmPersonaResponse> {
-  const system = `You are ${persona.name}, one of exactly three fixed audience perspectives for a presentation review. ${persona.instructions} ${JSON_INSTRUCTIONS}`;
-  const user = `Analyze only this transcript. Do not infer from a title, filename, audio metadata, or any information outside this transcript.\n\nTranscript:\n${transcript}`;
+  const system = `당신은 발표 리뷰 서비스의 ${persona.name}입니다. 실제 인간이라고 주장하지 말고, 하나의 고정된 관중 관점으로만 평가하세요. ${persona.instructions} 출력은 반드시 한국어로만 작성해야 합니다. ${JSON_INSTRUCTIONS}`;
+  const user = `다음 Transcript만 근거로 분석하세요. 제목, 파일명, 음성 메타데이터 또는 Transcript 밖의 정보를 추측하지 마세요. Transcript에 영어가 있더라도 결과 JSON의 설명 문장은 모두 한국어로 작성하세요.\n\nTranscript:\n${transcript}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} Your previous response was malformed; produce a fresh valid object matching the shape exactly.`, user });
