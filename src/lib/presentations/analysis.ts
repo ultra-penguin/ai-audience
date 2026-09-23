@@ -47,6 +47,20 @@ export function sentenceSegments(text: string): TranscriptSegment[] {
   }));
 }
 
+/** Provider transcripts have no model-derived difficulty until the LLM marks a focus. */
+function neutralSegments(text: string): TranscriptSegment[] {
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((part) => part.trim()).filter(Boolean) ?? [];
+  const parts = sentences.length > 0 ? sentences : [text.trim()];
+  return parts.map((sentence, index) => ({
+    id: `segment-${index + 1}`,
+    startSeconds: index * 12,
+    endSeconds: (index + 1) * 12,
+    text: sentence,
+    difficulty: "low" as const,
+    issue: null,
+  }));
+}
+
 export class MockPresentationAnalysisProvider implements PresentationAnalysisProvider {
   async analyze({ presentation }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes"> }): Promise<AnalysisResult> {
     const text = presentation.transcript?.trim() || SAMPLE_TRANSCRIPT;
@@ -134,7 +148,7 @@ export class ProviderPresentationAnalysisProvider implements PresentationAnalysi
       speechSegments = transcription.segments;
     }
     if (!transcript) throw new ProviderError("analysis_empty_transcript", "The recording did not contain recognizable speech.");
-    const segments: TranscriptSegment[] = speechSegments?.length ? speechSegments.map((segment, index) => ({ id: `segment-${index + 1}`, startSeconds: Math.max(0, segment.startSeconds), endSeconds: Math.max(segment.startSeconds + 0.1, segment.endSeconds), text: segment.text, difficulty: "low" as const, issue: null })) : sentenceSegments(transcript);
+    const segments: TranscriptSegment[] = speechSegments?.length ? speechSegments.map((segment, index) => ({ id: `segment-${index + 1}`, startSeconds: Math.max(0, segment.startSeconds), endSeconds: Math.max(segment.startSeconds + 0.1, segment.endSeconds), text: segment.text, difficulty: "low" as const, issue: null })) : neutralSegments(transcript);
     const responses = await Promise.all(FIXED_PERSONAS.map((persona) => callPersonaModel(this.languageModel, persona, transcript)));
     return providerResult(presentation, transcript, segments, responses);
   }
@@ -158,10 +172,12 @@ const ANALYSIS_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay >=
 const delay = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 function failureFor(error: unknown): { code: string; message: string } {
   if (error instanceof ProviderError) {
-    return error.code === "analysis_invalid_output" ? { code: "analysis_failed", message: "The analysis provider returned invalid analysis data." } : { code: error.code, message: error.message };
+    if (error.code === "analysis_invalid_output") return { code: "analysis_failed", message: "The analysis provider returned invalid analysis data." };
+    if (error.code === "analysis_provider_error") return { code: "analysis_failed", message: "The analysis provider could not complete the analysis." };
+    return { code: error.code, message: error.message };
   }
   if (error instanceof z.ZodError) return { code: "analysis_failed", message: "The analysis provider returned an invalid result." };
-  return { code: "analysis_provider_error", message: "The analysis provider could not complete the analysis." };
+  return { code: "analysis_failed", message: "The analysis provider could not complete the analysis." };
 }
 
 export async function runAnalysis(id: string, provider?: PresentationAnalysisProvider): Promise<void> {
