@@ -158,10 +158,11 @@ export const DifficultSectionSchema = z.object({
   transcript: z.string(),
   /** Exact substring of `transcript` where the audience got stuck. */
   highlight: z.string().optional(),
-  category: DifficultyCategorySchema,
-  severity: z.enum(["high", "medium", "low"]),
+  /** Optional when the provider only identified a difficult passage, not its category or severity. */
+  category: DifficultyCategorySchema.optional(),
+  severity: z.enum(["high", "medium", "low"]).optional(),
   /** Audience perspective → difficult point → reason → improvement. */
-  reactions: z.array(SectionReactionSchema).min(1),
+  reactions: z.array(SectionReactionSchema),
   reason: z.string(),
   improvement: z.object({
     suggestion: z.string(),

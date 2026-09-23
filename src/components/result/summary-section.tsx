@@ -36,7 +36,7 @@ export function SummarySection({ result }: { result: AnalysisResult }) {
         {priority ? (
           <div className="space-y-2">
             <p className="text-label-md text-on-surface-variant">
-              먼저 고칠 곳 · <span className="tabular-nums">{formatDuration(priority.startSec)}</span> {CATEGORY_LABEL[priority.category]}
+              먼저 고칠 곳 · <span className="tabular-nums">{formatDuration(priority.startSec)}</span> {priority.category ? CATEGORY_LABEL[priority.category] : "설명이 더 필요한 구간"}
             </p>
             <p className="text-body-lg text-on-surface">
               <mark className="rounded bg-error-container/70 px-1 text-on-surface">“{stumbleText(priority)}”</mark>

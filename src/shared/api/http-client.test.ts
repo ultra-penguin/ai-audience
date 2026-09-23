@@ -96,7 +96,8 @@ describe("HTTP client against the real API routes", () => {
     expect(result.durationSec).toBe(16);
     expect(result.personas.map((p) => p.kind)).toEqual(["beginner", "peer", "expert"]);
     expect(result.personaFeedback.find((f) => f.personaId === "p-beginner")?.understanding).toBe("lost");
-    expect(result.difficultSections[0]).toMatchObject({ id: "seg-2", startSec: 3.2, severity: "high" });
+    expect(result.difficultSections[0]).toMatchObject({ id: "seg-2", startSec: 3.2 });
+    expect(result.difficultSections[0]?.severity).toBeUndefined();
     expect(result.transcript?.segments.map((s) => s.id)).toEqual(["seg-1", "seg-2", "seg-3"]);
     expect(result.transcript?.text).toContain("MAPE");
   });

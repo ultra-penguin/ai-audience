@@ -45,25 +45,27 @@ export function toFrontendAnalysisResult(
   const improvementBySegmentId = new Map(
     result.improvements.flatMap((improvement) => improvement.sourceSegmentIds.map((segmentId) => [segmentId, improvement] as const)),
   );
+  const hasSectionEvidence = result.mode === "mock";
 
   const difficultSections = result.difficultSections.map((section, index) => {
     const segment = sectionBySegmentId.get(section.segmentId) ?? result.transcript.segments[index] ?? result.transcript.segments[0]!;
     const matchingImprovement = improvementBySegmentId.get(section.segmentId);
-    const reactions = result.personas
-      .filter((persona) => persona.blockers.length > 0)
-      .map((persona) => ({
-        personaId: `p-${persona.id}`,
-        reaction: persona.blockers[0] ?? persona.reaction,
-      }));
+    const reactions = hasSectionEvidence
+      ? result.personas
+          .filter((persona) => persona.blockers.length > 0)
+          .map((persona) => ({
+            personaId: `p-${persona.id}`,
+            reaction: persona.blockers[0] ?? persona.reaction,
+          }))
+      : [];
 
     return {
       id: section.segmentId,
       startSec: segment.startSeconds,
       endSec: segment.endSeconds,
       transcript: segment.text,
-      category: STAGE_CATEGORY[segment.difficulty],
-      severity: segment.difficulty,
-      reactions: reactions.length > 0 ? reactions : [{ personaId: "p-peer", reaction: section.reason }],
+      ...(hasSectionEvidence ? { category: STAGE_CATEGORY[segment.difficulty], severity: segment.difficulty } : {}),
+      reactions,
       reason: section.reason,
       improvement: {
         suggestion: matchingImprovement?.action ?? "이 부분을 한 문장으로 먼저 설명해 보세요.",
@@ -79,9 +81,7 @@ export function toFrontendAnalysisResult(
     reaction: persona.reaction,
     whatLanded: [],
     whereLost: persona.blockers,
-    difficultSectionIds: result.difficultSections
-      .filter((section) => persona.blockers.length > 0 || section.reason.length > 0)
-      .map((section) => section.segmentId),
+    difficultSectionIds: hasSectionEvidence ? result.difficultSections.map((section) => section.segmentId) : [],
   }));
 
   const missingExplanations = result.missingExplanations.map((text, index) => ({

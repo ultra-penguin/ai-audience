@@ -1,6 +1,6 @@
 import type { AnalysisResult, DifficultSection } from "@/shared/api/types";
 
-const SEVERITY_RANK: Record<DifficultSection["severity"], number> = { high: 0, medium: 1, low: 2 };
+const SEVERITY_RANK: Record<NonNullable<DifficultSection["severity"]>, number> = { high: 0, medium: 1, low: 2 };
 
 /** Reading order: as the talk was given. */
 export function sectionsByTime(sections: DifficultSection[]): DifficultSection[] {
@@ -12,7 +12,7 @@ export function sectionsByFixOrder(sections: DifficultSection[], priorityId?: st
   return [...sections].sort(
     (a, b) =>
       Number(b.id === priorityId) - Number(a.id === priorityId) ||
-      SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+      (a.severity ? SEVERITY_RANK[a.severity] : 3) - (b.severity ? SEVERITY_RANK[b.severity] : 3) ||
       a.startSec - b.startSec,
   );
 }

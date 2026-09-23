@@ -23,8 +23,8 @@ const PIPELINE: { stage: AnalysisStage; label: string; detail: string }[] = [
 
 /** What the seats are doing, in the audience's words. Mirrors the reported stage only. */
 const AUDIENCE_CAPTION: Record<AnalysisStage, string> = {
-  queued: "녹음을 받았어요. 말한 내용을 옮겨 적은 뒤에 관중이 듣기 시작해요.",
-  transcribing: "말한 내용을 옮겨 적고 있어요. 스크립트가 준비되면 관중이 듣기 시작해요.",
+  queued: "녹음은 도착했어요. 관중이 듣기 전에 발표를 준비하고 있어요.",
+  transcribing: "관중은 발표를 기다리고 있어요. 음성을 먼저 문장으로 정리하고 있어요.",
   listening: "세 관중이 각자의 시선으로 발표를 듣고 있어요.",
   synthesizing: "관중이 다 들었어요. 어디서 왜 막혔는지 정리하고 있어요.",
   completed: "관중이 다 들었어요. 결과를 정리했어요.",

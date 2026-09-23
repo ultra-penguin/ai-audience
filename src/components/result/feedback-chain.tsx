@@ -2,7 +2,7 @@ import type { DifficultSection, Persona } from "@/shared/api/types";
 import { PersonaChip } from "@/components/ui/persona-chip";
 import { cn, formatDuration } from "@/lib/utils";
 
-export const CATEGORY_LABEL: Record<DifficultSection["category"], string> = {
+export const CATEGORY_LABEL: Record<NonNullable<DifficultSection["category"]>, string> = {
   terminology: "낯선 용어",
   missing_context: "빠진 설명",
   pace: "속도",
@@ -57,21 +57,26 @@ export function FeedbackChain({
   compact?: boolean;
 }) {
   const byId = new Map(personas.map((p) => [p.id, p]));
+  const categoryLabel = section.category ? CATEGORY_LABEL[section.category] : "설명이 더 필요한 구간";
 
   return (
     <ol className={cn(compact ? "text-body-md" : "text-body-lg")}>
       <Step index={1} label="관중의 반응">
-        <ul className="space-y-3">
-          {section.reactions.map((r) => {
-            const persona = byId.get(r.personaId);
-            return (
-              <li key={r.personaId} className="space-y-1.5">
-                {persona && <PersonaChip persona={persona} />}
-                <p className="text-on-surface">“{r.reaction}”</p>
-              </li>
-            );
-          })}
-        </ul>
+        {section.reactions.length > 0 ? (
+          <ul className="space-y-3">
+            {section.reactions.map((r) => {
+              const persona = byId.get(r.personaId);
+              return (
+                <li key={r.personaId} className="space-y-1.5">
+                  {persona && <PersonaChip persona={persona} />}
+                  <p className="text-on-surface">“{r.reaction}”</p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-body-md text-on-surface-variant">관중별로 어느 사람이 막혔는지는 아직 구분하지 못했어요. 이 구간은 추가 설명이 필요한 지점으로 표시됐습니다.</p>
+        )}
       </Step>
 
       <Step index={2} label={`막힌 지점 · ${formatDuration(section.startSec)}–${formatDuration(section.endSec)}`}>
@@ -80,7 +85,7 @@ export function FeedbackChain({
         </blockquote>
       </Step>
 
-      <Step index={3} label={`이유 · ${CATEGORY_LABEL[section.category]}`}>
+      <Step index={3} label={`이유 · ${categoryLabel}`}>
         <p className="text-on-surface">{section.reason}</p>
       </Step>
 

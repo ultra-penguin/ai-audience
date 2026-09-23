@@ -25,7 +25,7 @@ describe("result report helpers", () => {
   });
 
   it("finds the sections a persona reacted to", () => {
-    expect(sectionsHeardBy(sections, "p-owner").map((s) => s.id)).toEqual(["sec-metric", "sec-conclusion"]);
+    expect(sectionsHeardBy(sections, "p-peer").map((s) => s.id)).toEqual(["sec-metric", "sec-features", "sec-conclusion"]);
     expect(sectionsHeardBy(sections, "nobody")).toEqual([]);
   });
 

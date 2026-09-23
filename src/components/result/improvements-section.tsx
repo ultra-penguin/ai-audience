@@ -21,7 +21,7 @@ function BeforeAfter({ section }: { section: DifficultSection }) {
         <ArrowRight className="hidden size-4 md:block" />
       </span>
       <figure className="rounded-lg bg-secondary-fixed/25 p-4 ring-1 ring-secondary/15">
-        <figcaption className="text-label-sm text-on-secondary-fixed-variant">이렇게 바꿔 말해 보세요</figcaption>
+        <figcaption className="text-label-sm text-on-secondary-fixed-variant">예시 문장</figcaption>
         <blockquote className="mt-2 text-body-md text-on-surface">{rewrite}</blockquote>
       </figure>
     </div>
@@ -70,7 +70,7 @@ export function ImprovementsSection({ result, number }: { result: AnalysisResult
                 <span aria-hidden className="text-label-md tabular-nums text-on-surface-variant">
                   {i + 1}.
                 </span>
-                <span className="text-label-lg text-on-surface">{CATEGORY_LABEL[s.category]}</span>
+                <span className="text-label-lg text-on-surface">{s.category ? CATEGORY_LABEL[s.category] : "설명이 더 필요한 구간"}</span>
                 <span className="rounded bg-surface-container px-1.5 py-0.5 text-label-md tabular-nums text-on-surface-variant">
                   {formatDuration(s.startSec)}
                 </span>

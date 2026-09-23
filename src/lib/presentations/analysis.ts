@@ -14,6 +14,7 @@ import {
 export interface PresentationAnalysisProvider {
   analyze(input: {
     presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">;
+    onStage?: (stage: "transcribing" | "evaluating" | "finalizing") => void;
   }): Promise<AnalysisResult>;
 }
 
@@ -62,10 +63,11 @@ function neutralSegments(text: string): TranscriptSegment[] {
 }
 
 export class MockPresentationAnalysisProvider implements PresentationAnalysisProvider {
-  async analyze({ presentation }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes"> }): Promise<AnalysisResult> {
+  async analyze({ presentation, onStage }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">; onStage?: (stage: "transcribing" | "evaluating" | "finalizing") => void }): Promise<AnalysisResult> {
+    onStage?.("evaluating");
     const text = presentation.transcript?.trim() || SAMPLE_TRANSCRIPT;
     const segments = sentenceSegments(text);
-    return analysisResultSchema.parse({
+    const result = analysisResultSchema.parse({
       version: "1.0", mode: "mock", disclaimer: "Sample/mock analysis for development only; this is not real AI feedback.", generatedAt: new Date().toISOString(),
       summary: { overview: "The main idea is promising, but one important concept would benefit from a concrete example before the live presentation.", comprehensionScore: 72, attentionScore: 78, keyMessageScore: 68 },
       transcript: { text, segments },
@@ -81,6 +83,8 @@ export class MockPresentationAnalysisProvider implements PresentationAnalysisPro
         { id: "improvement-2", title: "Explain how to prioritize feedback", problem: "The final recommendation does not tell the presenter which issue to fix first.", action: "State that repeated comprehension blockers come before stylistic refinements.", example: "Start with the concept that both beginner and peer listeners found unclear.", sourceSegmentIds: [segments[Math.min(2, segments.length - 1)]!.id] },
       ],
     });
+    onStage?.("finalizing");
+    return result;
   }
 }
 
@@ -133,24 +137,30 @@ function providerResult(presentation: Pick<StoredPresentation, "id" | "title" | 
   }));
   const comprehensionScore = Math.round(personas.reduce((sum, persona) => sum + persona.comprehensionScore, 0) / personas.length);
   const attentionScore = Math.round(personas.reduce((sum, persona) => sum + persona.attentionScore, 0) / personas.length);
-  return analysisResultSchema.parse({ version: "1.0", mode: "provider", disclaimer: "Generated from this transcript by the configured STT/LLM provider; feedback is informational.", generatedAt: new Date().toISOString(), summary: { overview: `세 관중의 반응을 종합하면 발표의 이해도는 ${comprehensionScore}점, 집중도는 ${attentionScore}점입니다. 가장 많이 반복된 이해의 걸림돌부터 보완해 보세요.`, comprehensionScore, attentionScore, keyMessageScore: comprehensionScore }, transcript: { text: transcript, segments }, personas, difficultSections, missingExplanations: uniqueStrings(responses.flatMap((response) => response.missingExplanations)).slice(0, 12), improvements });
+  const overview = relevantBlockers[0]
+    ? `발표의 핵심 흐름은 전달됐지만, ${relevantBlockers[0]} 때문에 이해가 끊겼습니다.`
+    : "발표의 핵심 흐름은 전달됐지만, 관중별로 더 확인할 지점이 남았습니다.";
+  return analysisResultSchema.parse({ version: "1.0", mode: "provider", disclaimer: "Generated from this transcript by the configured STT/LLM provider; feedback is informational.", generatedAt: new Date().toISOString(), summary: { overview, comprehensionScore, attentionScore, keyMessageScore: comprehensionScore }, transcript: { text: transcript, segments }, personas, difficultSections, missingExplanations: uniqueStrings(responses.flatMap((response) => response.missingExplanations)).slice(0, 12), improvements });
 }
 
 export class ProviderPresentationAnalysisProvider implements PresentationAnalysisProvider {
   constructor(private readonly speechToText: SpeechToTextProvider, private readonly languageModel: JsonLanguageModelProvider) {}
 
-  async analyze({ presentation }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes"> }): Promise<AnalysisResult> {
+  async analyze({ presentation, onStage }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">; onStage?: (stage: "transcribing" | "evaluating" | "finalizing") => void }): Promise<AnalysisResult> {
     let transcript = presentation.transcript?.trim() ?? "";
     let speechSegments: SpeechToTextResult["segments"];
     if (!transcript) {
       if (!presentation.audioBytes?.byteLength) throw new ProviderError("analysis_empty_transcript", "No transcript or retained audio is available for analysis.");
+      onStage?.("transcribing");
       const transcription = await this.speechToText.transcribe({ audio: presentation.audioBytes, metadata: presentation.audio });
       transcript = transcription.text.trim();
       speechSegments = transcription.segments;
     }
     if (!transcript) throw new ProviderError("analysis_empty_transcript", "The recording did not contain recognizable speech.");
+    onStage?.("evaluating");
     const segments: TranscriptSegment[] = speechSegments?.length ? speechSegments.map((segment, index) => ({ id: `segment-${index + 1}`, startSeconds: Math.max(0, segment.startSeconds), endSeconds: Math.max(segment.startSeconds + 0.1, segment.endSeconds), text: segment.text, difficulty: "low" as const, issue: null })) : neutralSegments(transcript);
     const responses = await Promise.all(FIXED_PERSONAS.map((persona) => callPersonaModel(this.languageModel, persona, transcript)));
+    onStage?.("finalizing");
     return providerResult(presentation, transcript, segments, responses);
   }
 }
@@ -190,8 +200,13 @@ export async function runAnalysis(id: string, provider?: PresentationAnalysisPro
     await delay(ANALYSIS_DELAY_MS);
     const current = presentationRepository.get(id);
     if (!current) return;
-    presentationRepository.update(id, { stage: "evaluating", progress: 60 });
-    const result = await activeProvider.analyze({ presentation: current });
+    const result = await activeProvider.analyze({
+      presentation: current,
+      onStage: (stage) => {
+        const progress = stage === "transcribing" ? 20 : stage === "evaluating" ? 60 : 85;
+        presentationRepository.update(id, { stage, progress });
+      },
+    });
     const validated = analysisResultSchema.parse(result);
     presentationRepository.update(id, { transcript: validated.transcript.text, status: "complete", stage: "complete", progress: 100, result: validated, error: null });
   } catch (error) {

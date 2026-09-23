@@ -24,30 +24,23 @@ export const SAMPLE_RESULT: AnalysisResult = {
     {
       id: "p-beginner",
       kind: "beginner",
-      name: "비전공 대학생",
-      description: "데이터 분석 수업을 들어본 적이 없고, 카페 아르바이트 경험만 있어요.",
+      name: "비전공 관중",
+      description: "데이터 분석을 처음 듣는 일반 관중이에요.",
       listensFor: "처음 듣는 말도 이해할 수 있게 풀어서 설명해 주는지",
     },
     {
       id: "p-peer",
       kind: "peer",
-      name: "같은 수업 동료",
-      description: "기초 통계는 알지만 이 프로젝트의 세부 내용은 처음 들어요.",
+      name: "일반 관중",
+      description: "주제에 관심은 있지만 세부 내용은 처음 듣는 관중이에요.",
       listensFor: "이야기의 흐름과 핵심 메시지가 한 번에 잡히는지",
     },
     {
       id: "p-expert",
       kind: "expert",
-      name: "데이터 분야 심사위원",
-      description: "예측 모델을 실무에서 다뤄본 전문가예요.",
+      name: "전문가 관중",
+      description: "예측 모델을 실무에서 다뤄본 전문가 관중이에요.",
       listensFor: "방법론의 근거와 검증 방식이 타당한지",
-    },
-    {
-      id: "p-owner",
-      kind: "decision_maker",
-      name: "카페 운영자",
-      description: "도입 여부를 결정하는 사람으로, 기술보다 비용과 효과에 관심이 많아요.",
-      listensFor: "그래서 얼마를 아낄 수 있고, 무엇을 해야 하는지",
     },
   ],
   personaFeedback: [
@@ -78,15 +71,6 @@ export const SAMPLE_RESULT: AnalysisResult = {
       whereLost: ["모델 비교의 근거와 검증 방법"],
       difficultSectionIds: ["sec-model"],
     },
-    {
-      personaId: "p-owner",
-      understanding: "lost",
-      receivedKeyMessage: false,
-      reaction: "그래서 한 달에 얼마를 아낄 수 있는지는 거의 마지막에 지나가듯 나와서 놓쳤어요. 제가 뭘 결정해야 하는지 처음부터 알고 싶었어요.",
-      whatLanded: ["폐기 문제의 심각성"],
-      whereLost: ["성능 지표 설명", "절감 금액이 나온 결론 부분"],
-      difficultSectionIds: ["sec-metric", "sec-conclusion"],
-    },
   ],
   difficultSections: [
     {
@@ -100,7 +84,7 @@ export const SAMPLE_RESULT: AnalysisResult = {
       severity: "high",
       reactions: [
         { personaId: "p-beginner", reaction: "MAPE가 뭔지 몰라서, 12.4%가 좋은 건지 판단할 수 없었어요." },
-        { personaId: "p-owner", reaction: "숫자는 들었는데 우리 가게에 어떤 의미인지 연결이 안 됐어요." },
+        { personaId: "p-peer", reaction: "숫자는 들었는데 우리 가게에 어떤 의미인지 연결이 안 됐어요." },
       ],
       reason:
         "전문 지표를 정의 없이 사용했고, ‘12.4% 개선’이 무엇의 12.4%인지(오차율인지, 판매량인지) 기준점이 빠져 있어요.",
@@ -159,7 +143,7 @@ export const SAMPLE_RESULT: AnalysisResult = {
       category: "key_message",
       severity: "high",
       reactions: [
-        { personaId: "p-owner", reaction: "가장 궁금했던 금액이 ‘참고로’ 뒤에 묻혀서 지나갔어요." },
+        { personaId: "p-peer", reaction: "가장 궁금했던 금액이 ‘참고로’ 뒤에 묻혀서 지나갔어요." },
       ],
       reason: "결정에 가장 중요한 숫자(월 절감액)가 결론의 부연처럼 전달돼 핵심 메시지로 인식되지 않아요.",
       improvement: {
@@ -175,7 +159,7 @@ export const SAMPLE_RESULT: AnalysisResult = {
       term: "MAPE",
       why: "입문 청중과 운영자가 성능 수치를 해석하지 못했어요.",
       suggestedExplanation: "예측값이 실제값과 평균 몇 % 차이 나는지를 나타내는 오차율이에요. 낮을수록 좋아요.",
-      personaIds: ["p-beginner", "p-owner"],
+      personaIds: ["p-beginner", "p-peer"],
       sectionId: "sec-metric",
     },
     {
@@ -207,7 +191,7 @@ export const SAMPLE_RESULT: AnalysisResult = {
       id: "ex-cost",
       concept: "예측 오차를 비용으로 바꾸기",
       example: "“예측이 하루 3개 덜 빗나가면, 크루아상 원가 1,500원 × 3개 × 30일 = 한 달 13만 5천 원이에요.”",
-      personaIds: ["p-owner"],
+      personaIds: ["p-peer"],
       sectionId: "sec-conclusion",
     },
   ],
