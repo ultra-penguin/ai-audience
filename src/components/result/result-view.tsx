@@ -11,17 +11,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError, isNotFoundError } from "@/shared/api";
 import { formatDurationLong } from "@/lib/utils";
 import { DifficultSections } from "./difficult-sections";
+import { ImprovementsSection } from "./improvements-section";
 import { PersonaFeedbackGrid } from "./persona-feedback-grid";
-import { PriorityFix } from "./priority-fix";
 import { SuggestionsSection } from "./suggestions-section";
 import { SummarySection } from "./summary-section";
 import { TranscriptSection } from "./transcript-section";
 
 export function ResultView({ id }: { id: string }) {
   const query = useAnalysisResult(id);
-  const setPersonaFilter = useResultUiStore((s) => s.setPersonaFilter);
+  const resetUi = useResultUiStore((s) => s.reset);
 
-  useEffect(() => setPersonaFilter(null), [id, setPersonaFilter]);
+  useEffect(() => resetUi(), [id, resetUi]);
 
   if (query.isPending) return <ResultSkeleton />;
 
@@ -82,13 +82,20 @@ export function ResultView({ id }: { id: string }) {
   }
 
   const result = query.data;
-  const priority = result.difficultSections.find((s) => s.id === result.summary.priorityFixSectionId);
+  // Chapters after the opening insight; optional ones drop out without leaving gaps in the numbering.
+  const hasFixes = result.difficultSections.length > 0;
+  const hasSuggestions = result.missingExplanations.length > 0 || result.exampleSuggestions.length > 0;
+  let chapter = 0;
+  const voicesNo = ++chapter;
+  const sectionsNo = ++chapter;
+  const fixesNo = hasFixes ? ++chapter : 0;
+  const suggestionsNo = hasSuggestions ? ++chapter : 0;
 
   return (
     <Container>
       <header className="space-y-3">
-        <p className="text-label-md text-on-surface-variant">발표 리뷰 결과</p>
-        <h1 className="text-headline-xl-mobile md:text-headline-xl text-on-surface text-balance">{result.title}</h1>
+        <p className="text-label-md text-on-surface-variant">발표 리뷰 리포트</p>
+        <h1 className="text-headline-md md:text-headline-lg text-on-surface text-balance">{result.title}</h1>
         <p className="text-body-md text-on-surface-variant">
           {formatDurationLong(result.durationSec)} · 관중 {result.personas.length}명이 들었어요
         </p>
@@ -101,10 +108,10 @@ export function ResultView({ id }: { id: string }) {
       )}
 
       <SummarySection result={result} />
-      {priority && <PriorityFix section={priority} personas={result.personas} />}
-      <PersonaFeedbackGrid result={result} />
-      <DifficultSections result={result} />
-      <SuggestionsSection result={result} />
+      <PersonaFeedbackGrid result={result} number={voicesNo} />
+      <DifficultSections result={result} number={sectionsNo} />
+      {hasFixes && <ImprovementsSection result={result} number={fixesNo} />}
+      {hasSuggestions && <SuggestionsSection result={result} number={suggestionsNo} />}
       <TranscriptSection result={result} />
 
       <section aria-labelledby="next-title" className="flex flex-col items-start gap-4 rounded-xl bg-surface-container-low p-6 md:flex-row md:items-center md:justify-between">

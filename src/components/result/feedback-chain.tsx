@@ -11,7 +11,7 @@ export const CATEGORY_LABEL: Record<DifficultSection["category"], string> = {
   key_message: "핵심 메시지",
 };
 
-function Highlighted({ text, highlight }: { text: string; highlight?: string }) {
+export function Highlighted({ text, highlight }: { text: string; highlight?: string }) {
   const at = highlight ? text.indexOf(highlight) : -1;
   if (!highlight || at < 0) return <>{text}</>;
   return (

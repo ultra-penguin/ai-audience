@@ -1,7 +1,8 @@
-import { CircleCheck, CircleDashed, CircleSlash } from "lucide-react";
+import { ArrowDown, CircleCheck, CircleDashed, CircleSlash } from "lucide-react";
 import type { AnalysisResult, Understanding } from "@/shared/api/types";
-import { PersonaChip } from "@/components/ui/persona-chip";
-import { cn } from "@/lib/utils";
+import { distinctKeyMessage, stumbleText } from "@/features/result/report";
+import { formatDuration } from "@/lib/utils";
+import { CATEGORY_LABEL } from "./feedback-chain";
 
 export const UNDERSTANDING: Record<Understanding, { label: string; icon: typeof CircleCheck; tone: string }> = {
   followed: { label: "끝까지 따라왔어요", icon: CircleCheck, tone: "text-secondary" },
@@ -9,43 +10,54 @@ export const UNDERSTANDING: Record<Understanding, { label: string; icon: typeof 
   lost: { label: "흐름을 놓쳤어요", icon: CircleSlash, tone: "text-error" },
 };
 
+/** The opening insight: one sentence of what happened, then where to start. */
 export function SummarySection({ result }: { result: AnalysisResult }) {
-  const { summary, personas, personaFeedback } = result;
+  const { summary, personaFeedback } = result;
   const received = personaFeedback.filter((f) => f.receivedKeyMessage).length;
-  const byId = new Map(personas.map((p) => [p.id, p]));
+  const keyMessage = distinctKeyMessage(summary);
+  const priority = result.difficultSections.find((s) => s.id === summary.priorityFixSectionId);
 
   return (
-    <section aria-labelledby="summary-title" className="space-y-6">
+    <section aria-labelledby="summary-title" className="space-y-8">
       <h2 id="summary-title" className="sr-only">
         한눈에 보기
       </h2>
-      <p className="max-w-3xl text-headline-md text-on-surface text-pretty">{summary.headline}</p>
+      <p className="max-w-3xl text-headline-lg md:text-headline-xl text-on-surface text-pretty">{summary.headline}</p>
 
-      <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
-        <div className="rounded-xl bg-surface-container-low p-5">
-          <p className="text-label-md text-on-surface-variant">전하려던 핵심 메시지</p>
-          <p className="mt-2 text-body-lg text-on-surface">“{summary.intendedKeyMessage}”</p>
-          <p className="mt-4 text-label-lg text-on-surface">
-            관중 {personaFeedback.length}명 중 {received}명이 이 메시지를 알아들었어요.
+      <div className="grid gap-x-10 gap-y-6 border-y border-outline-variant/60 py-6 md:grid-cols-2">
+        <div className="space-y-2">
+          <p className="text-label-md text-on-surface-variant">핵심 메시지</p>
+          {keyMessage && <p className="text-body-lg text-on-surface">“{keyMessage}”</p>}
+          <p className="text-label-lg text-on-surface">
+            관중 {personaFeedback.length}명 중 {received}명이 {keyMessage ? "이 메시지를" : "핵심 메시지를"} 알아들었어요.
           </p>
         </div>
 
-        <ul className="divide-y divide-outline-variant/50 rounded-xl bg-surface-container-lowest px-5 ring-1 ring-outline-variant/40">
-          {personaFeedback.map((f) => {
-            const persona = byId.get(f.personaId);
-            if (!persona) return null;
-            const u = UNDERSTANDING[f.understanding];
-            return (
-              <li key={f.personaId} className="flex flex-wrap items-center justify-between gap-2 py-3">
-                <PersonaChip persona={persona} />
-                <span className={cn("inline-flex items-center gap-1.5 text-body-md", u.tone)}>
-                  <u.icon aria-hidden className="size-4" />
-                  <span className="text-on-surface">{u.label}</span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        {priority ? (
+          <div className="space-y-2">
+            <p className="text-label-md text-on-surface-variant">
+              먼저 고칠 곳 · <span className="tabular-nums">{formatDuration(priority.startSec)}</span> {CATEGORY_LABEL[priority.category]}
+            </p>
+            <p className="text-body-lg text-on-surface">
+              <mark className="rounded bg-error-container/70 px-1 text-on-surface">“{stumbleText(priority)}”</mark>
+            </p>
+            <p className="text-body-md text-on-surface-variant">{priority.improvement.suggestion}</p>
+            <a
+              href={`#fix-${priority.id}`}
+              className="inline-flex items-center gap-1.5 rounded text-label-lg text-primary underline-offset-4 hover:underline"
+            >
+              고치는 방법 보기
+              <ArrowDown aria-hidden className="size-4" />
+            </a>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-label-md text-on-surface-variant">먼저 고칠 곳</p>
+            <p className="text-body-lg text-on-surface">
+              {result.difficultSections.length === 0 ? "크게 막힌 지점이 없었어요." : "아래 막힌 구간을 발표 순서대로 확인해 보세요."}
+            </p>
+          </div>
+        )}
       </div>
 
       {summary.strengths.length > 0 && (

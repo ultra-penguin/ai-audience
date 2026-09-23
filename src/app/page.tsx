@@ -1,15 +1,15 @@
 import { ArrowRight, Mic } from "lucide-react";
 import Link from "next/link";
+import { AudienceSeats } from "@/components/audience/audience-seats";
 import { FeedbackChain } from "@/components/result/feedback-chain";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PersonaChip } from "@/components/ui/persona-chip";
 import { SAMPLE_RESULT } from "@/mocks/sample-result";
 
 const STEPS = [
   { title: "발표를 녹음해요", body: "브라우저에서 마이크로 평소처럼 발표하세요. 중간에 일시정지할 수 있어요." },
-  { title: "가상 관중이 들어요", body: "배경지식과 관심사가 다른 관중들이 같은 발표를 각자의 시선으로 들어요." },
-  { title: "고칠 곳을 확인해요", body: "누가, 어디서, 왜 막혔는지와 함께 바로 써볼 수 있는 수정 문장을 받아요." },
+  { title: "가상 관중이 들어요", body: "비전공·일반·전문가 관중이 같은 발표를 각자의 시선으로 들어요." },
+  { title: "리포트로 확인해요", body: "한 줄 요약, 관중의 목소리, 막힌 문장, 바꿔 말하기 예시 순서로 읽어 내려가요." },
 ];
 
 export default function LandingPage() {
@@ -63,23 +63,12 @@ export default function LandingPage() {
 
       <section aria-labelledby="audience-title" className="border-t border-outline-variant/50 py-12 md:py-16">
         <div className="max-w-2xl space-y-3">
-          <h2 id="audience-title" className="text-headline-lg text-on-surface">한 발표, 여러 관중의 시선</h2>
+          <h2 id="audience-title" className="text-headline-lg text-on-surface">세 관중, 세 가지 시선</h2>
           <p className="text-body-lg text-on-surface-variant">
-            점수 대신 관중의 입장에서 들은 그대로를 보여드려요. 어느 한 관중이 기준이 되지 않도록, 서로 다른 지식과 관심을 가진 관중이 함께 들어요.
+            점수 대신 관중의 입장에서 들은 그대로를 보여드려요. 어느 한 관중이 기준이 되지 않도록, 배경지식이 다른 세 관중이 같은 발표를 함께 들어요.
           </p>
         </div>
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {SAMPLE_RESULT.personas.map((persona) => (
-            <li key={persona.id} className="rounded-xl bg-surface-container-low p-5">
-              <PersonaChip persona={persona} />
-              <p className="mt-3 text-body-md text-on-surface">{persona.description}</p>
-              <p className="mt-2 text-body-sm text-on-surface-variant">
-                <span className="text-on-surface">듣는 포인트</span> · {persona.listensFor}
-              </p>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-4 text-body-sm text-on-surface-variant">예시 관중 구성이에요. 실제 분석에서는 발표 주제에 맞는 3–5명의 관중이 함께 들어요.</p>
+        <AudienceSeats className="mt-8" />
       </section>
 
       <section className="border-t border-outline-variant/50 py-12 md:py-16">

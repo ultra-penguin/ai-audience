@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAnalysisStatus, useRetryAnalysis } from "@/features/presentation/queries";
+import { AudienceSeats } from "@/components/audience/audience-seats";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { isNotFoundError, safeErrorMessage, type AnalysisStage } from "@/shared/api";
+import { seatStateFor } from "@/lib/audience";
 import { cn } from "@/lib/utils";
 
 const PIPELINE: { stage: AnalysisStage; label: string; detail: string }[] = [
@@ -18,6 +20,16 @@ const PIPELINE: { stage: AnalysisStage; label: string; detail: string }[] = [
   { stage: "listening", label: "관중이 듣는 중", detail: "각 관중이 자기 관점에서 발표를 따라가고 있어요." },
   { stage: "synthesizing", label: "막힌 지점 정리", detail: "어디서, 왜 막혔는지와 고칠 방법을 정리하고 있어요." },
 ];
+
+/** What the seats are doing, in the audience's words. Mirrors the reported stage only. */
+const AUDIENCE_CAPTION: Record<AnalysisStage, string> = {
+  queued: "녹음을 받았어요. 말한 내용을 옮겨 적은 뒤에 관중이 듣기 시작해요.",
+  transcribing: "말한 내용을 옮겨 적고 있어요. 스크립트가 준비되면 관중이 듣기 시작해요.",
+  listening: "세 관중이 각자의 시선으로 발표를 듣고 있어요.",
+  synthesizing: "관중이 다 들었어요. 어디서 왜 막혔는지 정리하고 있어요.",
+  completed: "관중이 다 들었어요. 결과를 정리했어요.",
+  failed: "분석이 중간에 멈췄어요.",
+};
 
 function stageIndex(stage: AnalysisStage | undefined) {
   if (!stage) return 0;
@@ -72,6 +84,14 @@ export function AnalysisProgress({ id }: { id: string }) {
 
   return (
     <Shell>
+      <section aria-labelledby="audience-title" className="space-y-3">
+        <h2 id="audience-title" className="sr-only">
+          가상 관중
+        </h2>
+        <AudienceSeats state={seatStateFor(stage)} />
+        <p className="text-body-md text-on-surface-variant">{stage ? AUDIENCE_CAPTION[stage] : "분석 상태를 확인하고 있어요."}</p>
+      </section>
+
       <Card className="p-5 sm:p-8">
         <p role="status" aria-live="polite" className="sr-only">
           {status.isPending
@@ -160,10 +180,10 @@ export function AnalysisProgress({ id }: { id: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-10 md:px-8 md:py-14">
+    <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 md:px-8 md:py-14">
       <div className="space-y-2">
-        <h1 className="text-headline-xl-mobile md:text-headline-xl text-on-surface">관중이 발표를 듣고 있어요</h1>
-        <p className="text-body-lg text-on-surface-variant">서로 다른 관중이 각자의 시선으로 발표를 따라가며 막히는 곳을 찾고 있어요.</p>
+        <h1 className="text-headline-xl-mobile md:text-headline-xl text-on-surface">관중 리뷰를 준비하고 있어요</h1>
+        <p className="text-body-lg text-on-surface-variant">비전공·일반·전문가 관중이 같은 발표를 각자의 시선으로 듣고, 막히는 곳을 찾아요.</p>
       </div>
       {children}
     </div>

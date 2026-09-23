@@ -15,8 +15,8 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 |---|---|
 | `/` | Landing + sample feedback preview |
 | `/record` | MediaRecorder recording: start / pause / resume / finish, playback, upload |
-| `/analyzing/[id]` | Polls pipeline stages, failure + retry |
-| `/result/[id]` | Summary → first fix → persona reactions → difficult sections → missing explanations/examples |
+| `/analyzing/[id]` | Polls pipeline stages; the three audience seats animate only while the backend reports `listening`; failure + retry |
+| `/result/[id]` | Report: opening insight → persona voices → difficult-section reader (select/highlight) → fixes with before/after rewrites → missing explanations/examples |
 
 ## Frontend API layer
 

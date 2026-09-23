@@ -1,5 +1,6 @@
 import type { AnalysisResult } from "@/shared/api/types";
 import { cn, formatDuration } from "@/lib/utils";
+import { SectionLink } from "./report-parts";
 
 /** Full speech-to-text output, collapsed by default so the feedback stays first. */
 export function TranscriptSection({ result }: { result: AnalysisResult }) {
@@ -23,16 +24,16 @@ export function TranscriptSection({ result }: { result: AnalysisResult }) {
             {transcript.segments.map((segment) => {
               const difficult = difficultIds.has(segment.id);
               return (
-                <li key={segment.id} className="flex gap-3">
+                <li key={segment.id} className={cn("flex gap-3 rounded-lg", difficult && "-mx-2 bg-error-container/35 px-2 py-1.5")}>
                   <span className="h-fit shrink-0 rounded bg-surface-container px-1.5 py-0.5 text-label-md tabular-nums text-on-surface-variant">
                     {formatDuration(segment.startSec)}
                   </span>
                   <p className={cn("text-body-md", difficult ? "text-on-surface" : "text-on-surface-variant")}>
                     {segment.text}
                     {difficult && (
-                      <a href={`#${segment.id}`} className="ml-2 rounded text-label-md text-primary underline-offset-4 hover:underline">
-                        막힌 지점 보기
-                      </a>
+                      <SectionLink sectionId={segment.id} className="ml-2">
+                        막힌 구간 보기
+                      </SectionLink>
                     )}
                   </p>
                 </li>
