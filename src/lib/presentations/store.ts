@@ -1,6 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type { AnalysisPhase, AnalysisResult, AnalysisStage, PresentationInput, PresentationResponse, PresentationStatus } from "./schemas";
 
+export type AnalysisPipelineSnapshot = {
+  steps: Array<{ step: "structure" | "section" | "persona" | "cross_check"; state: "pending" | "running" | "done" | "failed" | "skipped" }>;
+  sections: Array<{ id: string; title: string; startSec?: number; endSec?: number; summary?: string; segmentIds?: string[] }>;
+  personas: Array<{ id: string; kind: "beginner" | "peer" | "expert"; name: string }>;
+  currentSectionId: string | null;
+  currentPersonaId: string | null;
+  cells: Array<{ sectionId: string; personaId: string; state: "pending" | "running" | "done" | "failed" | "skipped" }>;
+  message: string | null;
+  insights: Array<{ id: string; text: string; sectionId?: string; personaId?: string }>;
+};
+
 export type PresentationCreateInput = PresentationInput & {
   /** Retained only in the server-side repository for STT; never included in API responses. */
   audioBytes?: Uint8Array;
@@ -15,6 +26,7 @@ export type StoredPresentation = PresentationCreateInput & {
   currentSectionId: string | null;
   currentPersonaId: "beginner" | "peer" | "specialist" | null;
   message: string | null;
+  pipeline: AnalysisPipelineSnapshot | null;
   createdAt: string;
   updatedAt: string;
   result: AnalysisResult | null;
@@ -26,7 +38,7 @@ export interface PresentationRepository {
   get(id: string): StoredPresentation | undefined;
   update(
     id: string,
-    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "result" | "error" | "updatedAt" | "transcript">>,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "pipeline" | "result" | "error" | "updatedAt" | "transcript">>,
   ): StoredPresentation | undefined;
   clear(): void;
 }
@@ -46,6 +58,7 @@ export class InMemoryPresentationRepository implements PresentationRepository {
       currentSectionId: null,
       currentPersonaId: null,
       message: null,
+      pipeline: null,
       createdAt: now,
       updatedAt: now,
       result: null,
@@ -61,7 +74,7 @@ export class InMemoryPresentationRepository implements PresentationRepository {
 
   update(
     id: string,
-    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "result" | "error" | "updatedAt" | "transcript">>,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "pipeline" | "result" | "error" | "updatedAt" | "transcript">>,
   ): StoredPresentation | undefined {
     const record = this.records.get(id);
     if (!record) return undefined;

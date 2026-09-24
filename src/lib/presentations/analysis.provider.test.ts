@@ -64,6 +64,86 @@ describe("real analysis provider", () => {
     expect(result.transcript.text).toContain("첫 번째");
   });
 
+  it("runs the structured Korean pipeline and reports its live context", async () => {
+    const stages: string[] = [];
+    const languageModel: JsonLanguageModelProvider = {
+      completeJson: async ({ system }) => {
+        if (system.includes("발표 구조 분석기")) {
+          return JSON.stringify({
+            sections: [
+              { id: "intro", title: "도입", startSegmentIndex: 0, endSegmentIndex: 0, summary: "발표 주제를 소개합니다." },
+              { id: "concept", title: "핵심 개념", startSegmentIndex: 1, endSegmentIndex: 2, summary: "핵심 개념을 설명합니다." },
+            ],
+          });
+        }
+        if (system.includes("발표 분석 통합기")) {
+          return JSON.stringify({
+            headline: "핵심 개념의 설명이 비전공 관중에게 부족했어요.",
+            intendedKeyMessage: "핵심 개념을 쉽게 설명해야 합니다.",
+            strengths: ["도입의 주제가 명확합니다."],
+            discovery: {
+              kind: "common",
+              title: "여러 관중이 같은 구간에서 멈췄어요",
+              detail: "핵심 개념에서 추가 설명이 필요합니다.",
+              sectionId: "concept",
+              personaIds: ["beginner", "peer"],
+              evidence: "핵심 개념을 설명합니다.",
+            },
+          });
+        }
+        return JSON.stringify({
+          overallReaction: "도입은 이해했지만 핵심 개념은 설명이 더 필요합니다.",
+          sections: [
+            {
+              sectionId: "intro",
+              understanding: "followed",
+              comprehensionScore: 80,
+              attentionScore: 78,
+              reaction: "도입의 주제는 이해했습니다.",
+              evidence: "첫 번째 문장입니다.",
+              reason: "주제가 직접적으로 소개되었습니다.",
+              blockers: [],
+              questions: [],
+              needsExample: false,
+              improvement: null,
+            },
+            {
+              sectionId: "concept",
+              understanding: "partly_lost",
+              comprehensionScore: 58,
+              attentionScore: 60,
+              reaction: "핵심 개념을 한 번 더 풀어 설명해 주세요.",
+              evidence: "두 번째 문장입니다.",
+              reason: "개념의 정의가 짧습니다.",
+              blockers: ["핵심 개념의 정의가 부족합니다."],
+              questions: ["실제 예시는 무엇인가요?"],
+              needsExample: true,
+              improvement: { title: "개념을 먼저 정의하기", problem: "정의가 짧습니다.", action: "쉬운 말로 정의하세요.", example: "일상적인 사례를 덧붙이세요." },
+            },
+          ],
+        });
+      },
+    };
+    const provider = new ProviderPresentationAnalysisProvider(speechToText, languageModel);
+    const result = await provider.analyze({
+      presentation: {
+        id: "id",
+        title: "title",
+        durationSeconds: 2,
+        transcript: "첫 번째 문장입니다. 두 번째 문장입니다. 세 번째 문장입니다.",
+        audio: { filename: "talk.webm", mimeType: "audio/webm", sizeBytes: 4 },
+        audioBytes: new Uint8Array([1]),
+      },
+      onStage: (stage, context) => stages.push(`${stage}:${context?.phase}:${context?.pipeline?.steps.find((step) => step.state === "running")?.step ?? "none"}`),
+    });
+
+    expect(result.structure?.sections.map((section) => section.id)).toEqual(["intro", "concept"]);
+    expect(result.sectionAnalyses).toHaveLength(6);
+    expect(result.discovery?.sectionId).toBe("concept");
+    expect(stages).toContain("evaluating:persona:persona");
+    expect(stages).toContain("cross_check:cross_check:cross_check");
+  });
+
   it("retries malformed JSON once per persona", async () => {
     const calls = new Map<string, number>();
     const languageModel: JsonLanguageModelProvider = {

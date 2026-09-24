@@ -25,6 +25,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       sectionId: presentation.currentSectionId,
       personaId: presentation.currentPersonaId,
       message: presentation.message,
+      pipeline: presentation.pipeline,
       error: presentation.error,
       failedStage: presentation.error ? stage[presentation.stage] : undefined,
       updatedAt: presentation.updatedAt,

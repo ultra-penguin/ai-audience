@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { ApiError } from "./errors";
-import { presentationRepository, type StoredPresentation } from "./store";
+import { presentationRepository, type AnalysisPipelineSnapshot, type StoredPresentation } from "./store";
 import {
   analysisDiscoverySchema,
   analysisResultSchema,
   sectionAudienceAnalysisSchema,
-  structureSectionSchema,
   type AnalysisDiscovery,
   type AnalysisResult,
   type SectionAudienceAnalysis,
@@ -29,7 +28,13 @@ export interface PresentationAnalysisProvider {
 }
 
 type ProgressStage = "transcribing" | "structuring" | "segmenting" | "evaluating" | "cross_check" | "finalizing";
-type ProgressContext = { phase: "structure" | "section" | "persona" | "cross_check" | "synthesis"; sectionId?: string; personaId?: "beginner" | "peer" | "specialist"; message: string };
+type ProgressContext = {
+  phase: "structure" | "section" | "persona" | "cross_check" | "synthesis";
+  sectionId?: string;
+  personaId?: "beginner" | "peer" | "specialist";
+  message: string;
+  pipeline?: AnalysisPipelineSnapshot;
+};
 
 type FixedPersona = {
   id: "beginner" | "peer" | "specialist";
@@ -43,6 +48,49 @@ export const FIXED_PERSONAS: readonly FixedPersona[] = [
   { id: "peer", name: "일반 관중", perspective: "주제에 어느 정도 관심과 일반적인 업무 경험이 있는 관중", instructions: "발표의 흐름, 핵심 메시지, 집중을 유지할 수 있는 구조와 실용성을 살핍니다." },
   { id: "specialist", name: "전문가 관중", perspective: "주제의 세부 내용과 근거, 한계를 검토할 수 있는 전문가 관중", instructions: "주장의 정확성, 근거, 전제, 예외와 방법의 구체성이 충분한지 살핍니다." },
 ] as const;
+
+function pipelineSnapshot(
+  sections: StructureSection[] = [],
+  currentSectionId: string | null = null,
+  currentPersonaId: string | null = null,
+  activeStep: "structure" | "section" | "persona" | "cross_check" | null = "structure",
+  cells: AnalysisPipelineSnapshot["cells"] = [],
+  insights: AnalysisPipelineSnapshot["insights"] = [],
+): AnalysisPipelineSnapshot {
+  const order: AnalysisPipelineSnapshot["steps"][number]["step"][] = ["structure", "section", "persona", "cross_check"];
+  const activeIndex = activeStep === null ? order.length : order.indexOf(activeStep);
+  return {
+    steps: order.map((step, index) => ({ step, state: index < activeIndex ? "done" : index === activeIndex ? "running" : "pending" })),
+    sections: sections.map((section) => ({
+      id: section.id,
+      title: section.title,
+      startSec: section.startSeconds,
+      endSec: section.endSeconds,
+      summary: section.summary,
+      segmentIds: section.segmentIds,
+    })),
+    personas: FIXED_PERSONAS.map((persona) => ({ id: `p-${persona.id}`, kind: persona.id === "specialist" ? "expert" : persona.id, name: persona.name })),
+    currentSectionId,
+    currentPersonaId: currentPersonaId ? `p-${currentPersonaId}` : null,
+    cells,
+    message: null,
+    insights,
+  };
+}
+
+function personaCells(
+  sections: StructureSection[],
+  completedPersonaIds: string[],
+  activePersonaId: string | null,
+): AnalysisPipelineSnapshot["cells"] {
+  return FIXED_PERSONAS.flatMap((persona) =>
+    sections.map((section) => ({
+      sectionId: section.id,
+      personaId: `p-${persona.id}`,
+      state: completedPersonaIds.includes(persona.id) ? "done" : persona.id === activePersonaId ? "running" : "pending",
+    })),
+  );
+}
 
 const SAMPLE_TRANSCRIPT =
   "Today I will explain how our service turns presentation recordings into audience-centered feedback. First, we identify the key message. Then, we compare the transcript with the needs of beginner, peer, and specialist listeners. Finally, we recommend one concrete revision before the live talk.";
@@ -214,7 +262,7 @@ function numberedTranscript(segments: TranscriptSegment[]): string {
 
 async function callStructureModel(model: JsonLanguageModelProvider, segments: TranscriptSegment[]): Promise<{ structure?: StructureModelResponse; legacy?: LlmPersonaResponse }> {
   const system = `당신은 발표 구조 분석기입니다. 발표의 좋고 나쁨, 점수, 개선안, 관중 평가는 하지 마세요. 오직 발표가 어떤 구간으로 구성되어 있는지만 찾아야 합니다. ${KOREAN_JSON_RULE}
-Return only this JSON shape:
+아래 JSON 형식만 반환하세요:
 {"sections":[{"id":"intro","title":"도입","startSegmentIndex":0,"endSegmentIndex":1,"summary":"발표 주제와 문제 상황 소개"}]}
 구간은 transcript의 문장 번호를 사용하고 서로 겹치지 않게 하세요. 최대 8개로 나누세요.`;
   const user = `다음 발표 transcript를 구조적으로 나누세요. 점수나 평가를 만들지 마세요.\n\n${numberedTranscript(segments)}`;
@@ -238,7 +286,7 @@ Return only this JSON shape:
 async function callSectionPersonaModel(model: JsonLanguageModelProvider, persona: FixedPersona, structure: StructureSection[], segments: TranscriptSegment[]): Promise<SectionModelResponse> {
   const excerpts = structure.map((section) => ({ sectionId: section.id, title: section.title, summary: section.summary, transcript: section.segmentIds.map((id) => segments.find((segment) => segment.id === id)?.text ?? "").join(" ") }));
   const system = `당신은 ${persona.name} 관점의 발표 관중 시뮬레이터입니다. ${persona.instructions} 전체 발표를 한 번에 점수화하지 말고, 주어진 구간마다 실제 transcript 근거를 찾아 평가하세요. 실제 인간이라고 주장하지 말고, 관중 관점의 시뮬레이션임을 유지하세요. ${KOREAN_JSON_RULE}
-Return only this JSON shape:
+아래 JSON 형식만 반환하세요:
 {"overallReaction":"전체적으로 들은 느낌","sections":[{"sectionId":"intro","understanding":"followed","comprehensionScore":0,"attentionScore":0,"reaction":"관중의 한 문장 반응","evidence":"근거가 된 transcript 문장","reason":"그렇게 느낀 이유","blockers":[],"questions":[],"needsExample":false,"improvement":null}]}
 understanding은 followed, partly_lost, lost 중 하나이며 점수는 0에서 100 사이입니다.`;
   const user = `다음 구간만 근거로 ${persona.name}의 관점에서 분석하세요.\n\n${JSON.stringify(excerpts)}`;
@@ -259,7 +307,7 @@ understanding은 followed, partly_lost, lost 중 하나이며 점수는 0에서 
 
 async function callSynthesisModel(model: JsonLanguageModelProvider, structure: StructureSection[], analyses: SectionAudienceAnalysis[]): Promise<SynthesisModelResponse | null> {
   const system = `당신은 발표 분석 통합기입니다. 구간별 관중 분석을 비교해 발표자가 먼저 고칠 한 가지를 찾으세요. 하위 분석에 없는 사실을 추가하지 마세요. 점수보다 관중 차이와 transcript 근거를 우선하세요. ${KOREAN_JSON_RULE}
-Return only this JSON shape:
+아래 JSON 형식만 반환하세요:
 {"headline":"핵심 총평 한 문장","intendedKeyMessage":"발표자가 전달하려 한 핵심 메시지","strengths":["잘 전달된 점"],"discovery":{"kind":"common","title":"가장 큰 발견","detail":"발견 설명","sectionId":"intro","personaIds":["beginner"],"evidence":"근거 문장"}}`;
   const user = `발표 구조:\n${JSON.stringify(structure)}\n\n구간별 관중 분석:\n${JSON.stringify(analyses)}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -425,16 +473,45 @@ export class ProviderPresentationAnalysisProvider implements PresentationAnalysi
     }
 
     const structure = normaliseStructure(structureResponse.structure!, segments);
-    onStage?.("segmenting", { phase: "section", sectionId: structure[0]?.id, message: "발표를 분석할 핵심 구간으로 나누고 있어요." });
-    onStage?.("evaluating", { phase: "persona", message: "비전공·일반·전문가 관중의 관점에서 구간을 분석하고 있어요." });
-    const responses = await Promise.all(FIXED_PERSONAS.map((persona) => callSectionPersonaModel(this.languageModel, persona, structure, segments)));
+    onStage?.("segmenting", {
+      phase: "section",
+      sectionId: structure[0]?.id,
+      message: "발표를 분석할 핵심 구간으로 나누고 있어요.",
+      pipeline: pipelineSnapshot(structure, structure[0]?.id ?? null, null, "section"),
+    });
+    const responses: SectionModelResponse[] = [];
+    for (const persona of FIXED_PERSONAS) {
+      const completedPersonaIds = responses.map((_, index) => FIXED_PERSONAS[index]!.id);
+      onStage?.("evaluating", {
+        phase: "persona",
+        sectionId: structure[0]?.id,
+        personaId: persona.id,
+        message: `${persona.name}이 구간별로 발표를 듣고 있어요.`,
+        pipeline: pipelineSnapshot(
+          structure,
+          structure[0]?.id ?? null,
+          persona.id,
+          "persona",
+          personaCells(structure, completedPersonaIds, persona.id),
+        ),
+      });
+      responses.push(await callSectionPersonaModel(this.languageModel, persona, structure, segments));
+    }
     const sectionAnalyses = responses.flatMap((response, personaIndex) => response.sections.flatMap((section) => {
       const parsed = sectionAudienceAnalysisSchema.safeParse({ ...section, personaId: FIXED_PERSONAS[personaIndex]!.id });
       return parsed.success ? [parsed.data] : [];
     }));
-    onStage?.("cross_check", { phase: "cross_check", message: "관중들의 공통 반응과 의견 차이를 교차 검증하고 있어요." });
+    onStage?.("cross_check", {
+      phase: "cross_check",
+      message: "관중들의 공통 반응과 의견 차이를 교차 검증하고 있어요.",
+      pipeline: pipelineSnapshot(structure, null, null, "cross_check", personaCells(structure, FIXED_PERSONAS.map((persona) => persona.id), null)),
+    });
     const synthesis = await callSynthesisModel(this.languageModel, structure, sectionAnalyses);
-    onStage?.("finalizing", { phase: "synthesis", message: "발표자가 먼저 고칠 인사이트를 정리하고 있어요." });
+    onStage?.("finalizing", {
+      phase: "synthesis",
+      message: "발표자가 먼저 고칠 인사이트를 정리하고 있어요.",
+      pipeline: pipelineSnapshot(structure, null, null, null, personaCells(structure, FIXED_PERSONAS.map((persona) => persona.id), null)),
+    });
     return deepProviderResult(presentation, transcript, segments, structure, responses, synthesis);
   }
 }
@@ -485,6 +562,7 @@ export async function runAnalysis(id: string, provider?: PresentationAnalysisPro
           currentSectionId: context?.sectionId ?? null,
           currentPersonaId: context?.personaId ?? null,
           message: context?.message ?? null,
+          pipeline: context?.pipeline,
         });
       },
     });

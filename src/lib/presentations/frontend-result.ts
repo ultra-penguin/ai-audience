@@ -100,6 +100,36 @@ export function toFrontendAnalysisResult(
     sectionId: improvement.sourceSegmentIds[0],
   }));
 
+  const mapSections = result.structure?.sections.map((section) => {
+    const difficultSectionIds = result.difficultSections
+      .filter((difficult) => section.segmentIds.includes(difficult.segmentId))
+      .map((difficult) => difficult.segmentId);
+    return {
+      id: section.id,
+      title: section.title,
+      startSec: section.startSeconds,
+      endSec: section.endSeconds,
+      summary: section.summary,
+      segmentIds: section.segmentIds,
+      difficultSectionIds,
+    };
+  });
+
+  const audienceHeatmap = result.sectionAnalyses
+    ? {
+        cells: result.sectionAnalyses.map((analysis) => ({
+          sectionId: analysis.sectionId,
+          personaId: `p-${analysis.personaId}`,
+          reception: analysis.understanding === "followed" ? "clear" : analysis.understanding === "lost" ? "lost" : "partial",
+          evidence: analysis.evidence,
+        })),
+      }
+    : undefined;
+
+  const difficultSectionId = result.discovery?.sectionId
+    ? result.difficultSections.find((difficult) => result.structure?.sections.find((section) => section.id === result.discovery?.sectionId)?.segmentIds.includes(difficult.segmentId))?.segmentId
+    : undefined;
+
   return AnalysisResultSchema.parse({
     presentationId: record.id,
     title: record.title,
@@ -126,14 +156,8 @@ export function toFrontendAnalysisResult(
         text: segment.text,
       })),
     },
-    presentationMap: result.structure?.sections.map((section) => ({
-      id: section.id,
-      title: section.title,
-      startSec: section.startSeconds,
-      endSec: section.endSeconds,
-      summary: section.summary,
-      segmentIds: section.segmentIds,
-    })),
+    presentationMap: mapSections ? { sections: mapSections } : undefined,
+    audienceHeatmap,
     sectionAnalyses: result.sectionAnalyses?.map((analysis) => ({
       sectionId: analysis.sectionId,
       personaId: `p-${analysis.personaId}`,
@@ -147,6 +171,14 @@ export function toFrontendAnalysisResult(
       questions: analysis.questions,
       needsExample: analysis.needsExample,
     })),
-    discovery: result.discovery,
+    discovery: result.discovery
+      ? {
+          headline: result.discovery.title,
+          detail: result.discovery.detail,
+          sectionId: result.discovery.sectionId,
+          difficultSectionId,
+          personaIds: result.discovery.personaIds.map((personaId) => `p-${personaId}`),
+        }
+      : undefined,
   });
 }
