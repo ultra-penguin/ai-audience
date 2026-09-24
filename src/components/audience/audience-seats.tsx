@@ -1,5 +1,6 @@
 import { AUDIENCE_SEATS, SEAT_STATE_LABEL, type AudienceSeat, type SeatState } from "@/lib/audience";
 import { PERSONA_STYLE } from "@/lib/persona-style";
+import type { PersonaKind } from "@/shared/api/types";
 import { cn } from "@/lib/utils";
 
 const BAR_DELAYS_MS = [0, 220, 440, 140];
@@ -61,9 +62,17 @@ function Seat({ seat, state, index }: { seat: AudienceSeat; state?: SeatState; i
 
 /**
  * The three fixed audience perspectives, seated in front of the talk.
- * Without `state` they are a static introduction (landing page).
+ * Without `state` they are a static introduction (landing page). `state` is
+ * either one state for every seat or a per-persona map from reported progress.
  */
-export function AudienceSeats({ state, className }: { state?: SeatState; className?: string }) {
+export function AudienceSeats({
+  state,
+  className,
+}: {
+  state?: SeatState | Partial<Record<PersonaKind, SeatState>>;
+  className?: string;
+}) {
+  const stateOf = (kind: PersonaKind) => (typeof state === "object" ? (state[kind] ?? "waiting") : state);
   return (
     <div className={className}>
       <div aria-hidden className="mb-3 flex items-center gap-3 text-label-sm text-on-surface-variant">
@@ -73,7 +82,7 @@ export function AudienceSeats({ state, className }: { state?: SeatState; classNa
       </div>
       <ul aria-label="가상 관중" className="grid gap-3 sm:grid-cols-3">
         {AUDIENCE_SEATS.map((seat, i) => (
-          <Seat key={seat.kind} seat={seat} state={state} index={i} />
+          <Seat key={seat.kind} seat={seat} state={stateOf(seat.kind)} index={i} />
         ))}
       </ul>
     </div>

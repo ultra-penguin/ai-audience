@@ -10,9 +10,11 @@ import { Notice } from "@/components/ui/notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError, isNotFoundError } from "@/shared/api";
 import { formatDurationLong } from "@/lib/utils";
+import { mapSections } from "@/features/result/story";
 import { DifficultSections } from "./difficult-sections";
 import { ImprovementsSection } from "./improvements-section";
 import { PersonaFeedbackGrid } from "./persona-feedback-grid";
+import { DiscoverySection, PresentationMapSection } from "./story-sections";
 import { SuggestionsSection } from "./suggestions-section";
 import { SummarySection } from "./summary-section";
 import { TranscriptSection } from "./transcript-section";
@@ -85,7 +87,9 @@ export function ResultView({ id }: { id: string }) {
   // Chapters after the opening insight; optional ones drop out without leaving gaps in the numbering.
   const hasFixes = result.difficultSections.length > 0;
   const hasSuggestions = result.missingExplanations.length > 0 || result.exampleSuggestions.length > 0;
+  const hasMap = mapSections(result).length > 0;
   let chapter = 0;
+  const mapNo = hasMap ? ++chapter : 0;
   const voicesNo = ++chapter;
   const sectionsNo = ++chapter;
   const fixesNo = hasFixes ? ++chapter : 0;
@@ -108,6 +112,8 @@ export function ResultView({ id }: { id: string }) {
       )}
 
       <SummarySection result={result} />
+      <DiscoverySection result={result} />
+      {hasMap && <PresentationMapSection result={result} number={mapNo} />}
       <PersonaFeedbackGrid result={result} number={voicesNo} />
       <DifficultSections result={result} number={sectionsNo} />
       {hasFixes && <ImprovementsSection result={result} number={fixesNo} />}

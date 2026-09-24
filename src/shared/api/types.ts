@@ -92,6 +92,62 @@ export const AnalysisStageSchema = z.enum([
 ]);
 export type AnalysisStage = z.infer<typeof AnalysisStageSchema>;
 
+/**
+ * Phase 4 analysis steps inside "listening"/"synthesizing". Reported by the
+ * backend in `AnalysisStatus.pipeline`; the UI never infers them from time.
+ *   structure   the talk is split into a presentation map of sections
+ *   section     each section's role/claim is read
+ *   persona     each audience persona listens section by section
+ *   cross_check personas are compared and the result is synthesised
+ */
+export const AnalysisStepSchema = z.enum(["structure", "section", "persona", "cross_check"]);
+export type AnalysisStep = z.infer<typeof AnalysisStepSchema>;
+
+export const StepStateSchema = z.enum(["pending", "running", "done", "failed", "skipped"]);
+export type StepState = z.infer<typeof StepStateSchema>;
+
+export const MapSectionSchema = z.object({
+  id: z.string(),
+  /** Short Korean label, e.g. "문제 제기". */
+  title: z.string(),
+  startSec: z.number().min(0).optional(),
+  endSec: z.number().min(0).optional(),
+  /** One-sentence gist of what this part of the talk says. */
+  summary: z.string().optional(),
+  /** Transcript segment ids covered by this section (for anchors into the script). */
+  segmentIds: z.array(z.string()).optional(),
+  /** Difficult sections (DifficultSection.id) that fall inside this section. */
+  difficultSectionIds: z.array(z.string()).optional(),
+});
+export type MapSection = z.infer<typeof MapSectionSchema>;
+
+export const PipelineInsightSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  sectionId: z.string().optional(),
+  personaId: z.string().optional(),
+});
+export type PipelineInsight = z.infer<typeof PipelineInsightSchema>;
+
+/** Truthful per-step metadata. Everything is optional; absent means "not reported". */
+export const AnalysisPipelineSchema = z.object({
+  steps: z.array(z.object({ step: AnalysisStepSchema, state: StepStateSchema })).optional(),
+  /** Sections found by the structure step (may arrive before any listening starts). */
+  sections: z.array(MapSectionSchema).optional(),
+  personas: z.array(z.object({ id: z.string(), kind: z.lazy(() => PersonaKindSchema), name: z.string() })).optional(),
+  currentSectionId: z.string().nullish(),
+  currentPersonaId: z.string().nullish(),
+  /** Persona × section progress, one entry per pair the backend has scheduled. */
+  cells: z
+    .array(z.object({ sectionId: z.string(), personaId: z.string(), state: StepStateSchema }))
+    .optional(),
+  /** Short Korean explanation of what the backend is doing right now. */
+  message: z.string().nullish(),
+  /** Concise findings so far, oldest first. */
+  insights: z.array(PipelineInsightSchema).optional(),
+});
+export type AnalysisPipeline = z.infer<typeof AnalysisPipelineSchema>;
+
 export const AnalysisStatusSchema = z.object({
   presentationId: z.string(),
   stage: AnalysisStageSchema,
@@ -105,6 +161,8 @@ export const AnalysisStatusSchema = z.object({
   sectionId: z.string().nullish(),
   personaId: z.enum(["beginner", "peer", "specialist"]).nullish(),
   message: z.string().nullish(),
+  /** Optional Phase 4 detail. Malformed detail is dropped rather than failing the poll. */
+  pipeline: AnalysisPipelineSchema.nullish().catch(null),
   updatedAt: z.string(),
 });
 export type AnalysisStatus = z.infer<typeof AnalysisStatusSchema>;
@@ -222,16 +280,7 @@ export const TranscriptSchema = z.object({
 });
 export type Transcript = z.infer<typeof TranscriptSchema>;
 
-export const PresentationMapSectionSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  startSec: z.number().min(0),
-  endSec: z.number().min(0),
-  summary: z.string(),
-  segmentIds: z.array(z.string()),
-});
-export type PresentationMapSection = z.infer<typeof PresentationMapSectionSchema>;
-
+/** How one persona received one presentation-map section. */
 export const SectionAudienceAnalysisSchema = z.object({
   sectionId: z.string(),
   personaId: z.string(),
@@ -247,6 +296,30 @@ export const SectionAudienceAnalysisSchema = z.object({
 });
 export type SectionAudienceAnalysis = z.infer<typeof SectionAudienceAnalysisSchema>;
 
+export const ReceptionSchema = z.enum(["clear", "partial", "lost"]);
+export type Reception = z.infer<typeof ReceptionSchema>;
+
+export const HeatmapCellSchema = z.object({
+  sectionId: z.string(),
+  personaId: z.string(),
+  reception: ReceptionSchema,
+  /** The listener's own words or the transcript evidence behind the rating. */
+  evidence: z.string().optional(),
+});
+export type HeatmapCell = z.infer<typeof HeatmapCellSchema>;
+
+export const DiscoverySchema = z.object({
+  /** The single most important thing the audience revealed. */
+  headline: z.string(),
+  detail: z.string().optional(),
+  /** Presentation-map section id and/or difficult section id it points at. */
+  sectionId: z.string().optional(),
+  difficultSectionId: z.string().optional(),
+  personaIds: z.array(z.string()).optional(),
+});
+export type Discovery = z.infer<typeof DiscoverySchema>;
+
+/** Backward-compatible internal discovery shape used before the result story contract. */
 export const AnalysisDiscoverySchema = z.object({
   kind: z.enum(["common", "split"]),
   title: z.string(),
@@ -271,8 +344,13 @@ export const AnalysisResultSchema = z.object({
   missingExplanations: z.array(MissingExplanationSchema),
   exampleSuggestions: z.array(ExampleSuggestionSchema),
   transcript: TranscriptSchema.optional(),
-  presentationMap: z.array(PresentationMapSectionSchema).optional(),
+  /** Phase 4, optional: talk structure in speaking order. */
+  presentationMap: z.object({ sections: z.array(MapSectionSchema) }).optional().catch(undefined),
+  /** Phase 4, optional: persona × section reception with evidence. */
+  audienceHeatmap: z.object({ cells: z.array(HeatmapCellSchema) }).optional().catch(undefined),
+  /** Legacy detailed rows retained for provider compatibility and diagnostics. */
   sectionAnalyses: z.array(SectionAudienceAnalysisSchema).optional(),
-  discovery: AnalysisDiscoverySchema.optional(),
+  /** Phase 4, optional: the biggest discovery, written by the cross-check step. */
+  discovery: DiscoverySchema.optional().catch(undefined),
 });
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;

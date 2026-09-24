@@ -12,7 +12,7 @@ export const presentationKeys = {
 
 const TERMINAL_STAGES: AnalysisStage[] = ["completed", "failed"];
 const POLL_INTERVAL_MS = 1500;
-const DEMO_IDS = new Set(["sample", "demo-empty", "demo-failed"]);
+const DEMO_IDS = new Set(["sample", "demo-empty", "demo-failed", "demo-legacy"]);
 const demoApi = createMockClient();
 const clientFor = (id: string) => (DEMO_IDS.has(id) ? demoApi : api);
 

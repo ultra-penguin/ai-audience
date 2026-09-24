@@ -7,7 +7,7 @@ import { CATEGORY_LABEL } from "./feedback-chain";
 import { ReportHeading, SectionLink } from "./report-parts";
 
 /** What was said next to the rewrite the analysis suggested, when there is one. */
-function BeforeAfter({ section }: { section: DifficultSection }) {
+export function BeforeAfter({ section }: { section: DifficultSection }) {
   const rewrite = section.improvement.rewrite?.trim();
   if (!rewrite) return null;
   return (

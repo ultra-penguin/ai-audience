@@ -12,6 +12,9 @@ type ResultUiState = {
   selectSection: (sectionId: string | null) => void;
   /** Jump to a section from elsewhere in the report, clearing a filter that would hide it. */
   focusSection: (sectionId: string) => void;
+  /** Transcript segments to reveal and mark in the full script (from the presentation map). */
+  scriptFocusIds: string[];
+  focusScript: (segmentIds: string[]) => void;
   reset: () => void;
 };
 
@@ -21,5 +24,7 @@ export const useResultUiStore = create<ResultUiState>()((set) => ({
   setPersonaFilter: (personaFilter) => set({ personaFilter }),
   selectSection: (selectedSectionId) => set({ selectedSectionId }),
   focusSection: (selectedSectionId) => set({ selectedSectionId, personaFilter: null }),
-  reset: () => set({ personaFilter: null, selectedSectionId: null }),
+  scriptFocusIds: [],
+  focusScript: (scriptFocusIds) => set({ scriptFocusIds }),
+  reset: () => set({ personaFilter: null, selectedSectionId: null, scriptFocusIds: [] }),
 }));

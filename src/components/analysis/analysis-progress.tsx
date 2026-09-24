@@ -5,24 +5,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAnalysisStatus, useRetryAnalysis } from "@/features/presentation/queries";
+import {
+  activePersonaId,
+  analysisTimeline,
+  hasStepDetail,
+  runningItem,
+  seatStatesFor,
+  type TimelineItem,
+} from "@/features/analysis/pipeline";
 import { AudienceSeats } from "@/components/audience/audience-seats";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
+import { PersonaChip } from "@/components/ui/persona-chip";
 import { Spinner } from "@/components/ui/spinner";
-import { isNotFoundError, safeErrorMessage, type AnalysisStage } from "@/shared/api";
-import { seatStateFor } from "@/lib/audience";
+import { isNotFoundError, safeErrorMessage, type AnalysisStage, type AnalysisStatus } from "@/shared/api";
 import { cn } from "@/lib/utils";
-
-const PIPELINE: { stage: AnalysisStage; label: string; detail: string }[] = [
-  { stage: "queued", label: "녹음 받기", detail: "업로드한 녹음을 확인하고 있어요." },
-  { stage: "transcribing", label: "말한 내용 옮겨 적기", detail: "발표 음성을 문장 단위로 옮겨 적고 있어요." },
-  { stage: "structuring", label: "발표 구조 파악", detail: "도입·핵심 내용·마무리가 어떻게 이어지는지 살펴보고 있어요." },
-  { stage: "segmenting", label: "핵심 구간 나누기", detail: "관중이 다르게 받아들일 수 있는 구간을 나누고 있어요." },
-  { stage: "listening", label: "관중이 듣는 중", detail: "각 관중이 자기 관점에서 발표를 따라가고 있어요." },
-  { stage: "cross_check", label: "관중 의견 비교", detail: "공통으로 막힌 곳과 관중별 차이를 비교하고 있어요." },
-  { stage: "synthesizing", label: "막힌 지점 정리", detail: "어디서, 왜 막혔는지와 고칠 방법을 정리하고 있어요." },
-];
+import { StructureProgress, InsightCards } from "./structure-progress";
 
 /** What the seats are doing, in the audience's words. Mirrors the reported stage only. */
 const AUDIENCE_CAPTION: Record<AnalysisStage, string> = {
@@ -37,10 +36,15 @@ const AUDIENCE_CAPTION: Record<AnalysisStage, string> = {
   failed: "분석이 중간에 멈췄어요.",
 };
 
-function stageIndex(stage: AnalysisStage | undefined) {
-  if (!stage) return 0;
-  if (stage === "completed") return PIPELINE.length;
-  return Math.max(0, PIPELINE.findIndex((s) => s.stage === stage));
+function captionFor(status: AnalysisStatus | undefined): string {
+  if (!status) return "분석 상태를 확인하고 있어요.";
+  // With step detail, "listening" covers structure and section reading too; only claim listening when a persona is.
+  if (status.stage === "listening" && hasStepDetail(status.pipeline)) {
+    const active = activePersonaId(status);
+    const name = status.pipeline.personas?.find((p) => p.id === active)?.name;
+    return name ? `지금은 ${name} 차례예요. 관중은 한 명씩 발표를 들어요.` : "관중이 듣기 전에 발표의 흐름을 먼저 살펴보고 있어요.";
+  }
+  return AUDIENCE_CAPTION[status.stage];
 }
 
 export function AnalysisProgress({ id }: { id: string }) {
@@ -49,9 +53,12 @@ export function AnalysisProgress({ id }: { id: string }) {
   const retry = useRetryAnalysis(id);
 
   const stage = status.data?.stage;
-  const current = stageIndex(stage);
   const failed = stage === "failed";
   const completed = stage === "completed";
+  const pipeline = status.data?.pipeline;
+  const detailed = hasStepDetail(pipeline);
+  const timeline = analysisTimeline(status.data);
+  const running = runningItem(timeline);
 
   useEffect(() => {
     if (completed) router.replace(`/result/${encodeURIComponent(id)}`);
@@ -85,17 +92,14 @@ export function AnalysisProgress({ id }: { id: string }) {
     );
   }
 
-  // Mark the step that was running when the pipeline failed, if the server says.
-  const failedAt = failed ? PIPELINE.findIndex((s) => s.stage === status.data?.failedStage) : -1;
-
   return (
     <Shell>
       <section aria-labelledby="audience-title" className="space-y-3">
         <h2 id="audience-title" className="sr-only">
           가상 관중
         </h2>
-        <AudienceSeats state={seatStateFor(stage)} />
-        <p className="text-body-md text-on-surface-variant">{stage ? AUDIENCE_CAPTION[stage] : "분석 상태를 확인하고 있어요."}</p>
+        <AudienceSeats state={seatStatesFor(status.data)} />
+        <p className="text-body-md text-on-surface-variant">{captionFor(status.data)}</p>
       </section>
 
       <Card className="p-5 sm:p-8">
@@ -106,43 +110,22 @@ export function AnalysisProgress({ id }: { id: string }) {
               ? "분석이 끝났어요. 결과 화면으로 이동해요."
               : failed
                 ? "분석에 실패했어요."
-                : `${PIPELINE[current]?.label} 단계예요.`}
+                : running
+                  ? `${running.label} 단계예요.`
+                  : "분석 상태를 확인하고 있어요."}
         </p>
 
+        <h2 className="sr-only">분석 단계</h2>
         <ol className="space-y-1">
-          {PIPELINE.map((step, i) => {
-            const done = completed || (!failed && i < current) || (failed && i < failedAt);
-            const active = !completed && !failed && i === current;
-            const broken = failed && i === failedAt;
-            return (
-              <li
-                key={step.stage}
-                aria-current={active ? "step" : undefined}
-                className={cn("flex gap-4 rounded-lg p-3", active && "bg-surface-container-low")}
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-full text-label-md",
-                    done && "bg-secondary text-on-secondary",
-                    active && "bg-primary-container text-on-primary",
-                    broken && "bg-error text-on-error",
-                    !done && !active && !broken && "bg-surface-container text-on-surface-variant",
-                  )}
-                >
-                  {done ? <Check className="size-4" /> : active ? <Spinner /> : broken ? "!" : i + 1}
-                </span>
-                <div className="min-w-0 pt-1">
-                  <p className={cn("text-label-lg", done || active || broken ? "text-on-surface" : "text-on-surface-variant")}>
-                    {step.label}
-                    <span className="sr-only">{done ? " (완료)" : active ? " (진행 중)" : broken ? " (실패)" : " (대기)"}</span>
-                  </p>
-                  {active && <p className="mt-1 text-body-md text-on-surface-variant">{step.detail}</p>}
-                  {broken && <p className="mt-1 text-body-md text-on-surface-variant">이 단계에서 멈췄어요.</p>}
-                </div>
-              </li>
-            );
-          })}
+          {timeline.map((item, i) => (
+            <TimelineRow
+              key={item.key}
+              item={item}
+              index={i}
+              // The backend's own explanation replaces the generic copy for the running step.
+              detail={item === running && detailed && pipeline.message ? pipeline.message : item.detail}
+            />
+          ))}
         </ol>
 
         {failed && (
@@ -175,12 +158,83 @@ export function AnalysisProgress({ id }: { id: string }) {
           </div>
         )}
       </Card>
+
+      {detailed && status.data && <NowListening status={status.data} />}
+      {detailed && <StructureProgress status={status.data!} />}
+      {detailed && <InsightCards pipeline={pipeline} />}
+
       {!failed && !completed && (
         <p className="text-body-sm text-on-surface-variant">
           보통 1–2분 정도 걸려요. 이 페이지를 열어 두면 끝나는 대로 결과 화면으로 넘어가요.
         </p>
       )}
     </Shell>
+  );
+}
+
+const STATE_SR: Record<TimelineItem["state"], string> = {
+  done: " (완료)",
+  running: " (진행 중)",
+  failed: " (실패)",
+  pending: " (대기)",
+  skipped: " (건너뜀)",
+};
+
+function TimelineRow({ item, index, detail }: { item: TimelineItem; index: number; detail: string }) {
+  const { state } = item;
+  const active = state === "running";
+  return (
+    <li aria-current={active ? "step" : undefined} className={cn("flex gap-4 rounded-lg p-3", active && "bg-surface-container-low")}>
+      <span
+        aria-hidden
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-full text-label-md",
+          state === "done" && "bg-secondary text-on-secondary",
+          active && "bg-primary-container text-on-primary",
+          state === "failed" && "bg-error text-on-error",
+          (state === "pending" || state === "skipped") && "bg-surface-container text-on-surface-variant",
+        )}
+      >
+        {state === "done" ? <Check className="size-4" /> : active ? <Spinner /> : state === "failed" ? "!" : state === "skipped" ? "–" : index + 1}
+      </span>
+      <div className="min-w-0 pt-1">
+        <p className={cn("text-label-lg", state === "pending" || state === "skipped" ? "text-on-surface-variant" : "text-on-surface")}>
+          {item.label}
+          <span className="sr-only">{STATE_SR[state]}</span>
+        </p>
+        {active && (
+          <p key={detail} className="mt-1 animate-rise-in text-body-md text-on-surface-variant motion-reduce:animate-none">
+            {detail}
+          </p>
+        )}
+        {state === "failed" && <p className="mt-1 text-body-md text-on-surface-variant">이 단계에서 멈췄어요.</p>}
+      </div>
+    </li>
+  );
+}
+
+/** Current section and persona, shown only while the backend names them. */
+function NowListening({ status }: { status: AnalysisStatus }) {
+  const pipeline = status.pipeline!;
+  if (status.stage === "failed" || status.stage === "completed") return null;
+  const section = pipeline.sections?.find((s) => s.id === pipeline.currentSectionId);
+  const personaId = activePersonaId(status);
+  const persona = pipeline.personas?.find((p) => p.id === personaId);
+  if (!section && !persona) return null;
+
+  return (
+    <section aria-labelledby="now-title" className="space-y-3 rounded-xl bg-surface-container-low p-5">
+      <h2 id="now-title" className="text-label-md text-on-surface-variant">
+        지금 보고 있는 곳
+      </h2>
+      <div key={`${section?.id}:${persona?.id}`} className="animate-rise-in space-y-2 motion-reduce:animate-none">
+        <p className="flex flex-wrap items-center gap-2">
+          {persona && <PersonaChip persona={persona} />}
+          {section && <span className="text-headline-sm text-on-surface">{section.title}</span>}
+        </p>
+        {section?.summary && <p className="text-body-md text-on-surface-variant">{section.summary}</p>}
+      </div>
+    </section>
   );
 }
 

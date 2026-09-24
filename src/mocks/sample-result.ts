@@ -195,6 +195,85 @@ export const SAMPLE_RESULT: AnalysisResult = {
       sectionId: "sec-conclusion",
     },
   ],
+  transcript: {
+    text: "",
+    segments: [
+      { id: "seg-01", startSec: 0, endSec: 22, text: "안녕하세요. 오늘은 저희 동네 카페에서 매일 버려지는 재료 이야기로 시작해 보려고 합니다." },
+      { id: "seg-02", startSec: 22, endSec: 47, text: "이 사진은 지난주 화요일 마감 후에 버린 우유와 크루아상이에요. 이런 날이 한 달에 열흘이 넘습니다." },
+      { id: "sec-metric", startSec: 48, endSec: 71, text: "저희가 만든 모델은 기존 방식 대비 MAPE 기준으로 12.4% 개선된 성능을 보였고, 이는 꽤 의미 있는 수치라고 생각합니다." },
+      { id: "seg-04", startSec: 71, endSec: 95, text: "그래서 이 결과가 어떻게 나왔는지, 어떤 데이터를 썼는지 먼저 설명드리겠습니다." },
+      { id: "seg-05", startSec: 96, endSec: 124, text: "데이터는 지난 1년간의 판매 기록과 날씨, 그리고 주변 행사 일정을 모았습니다." },
+      { id: "sec-features", startSec: 125, endSec: 160, text: "입력 변수로는 요일, 공휴일 여부, 기온, 강수량, 전주 판매량, 이동평균, 인근 행사, 프로모션 여부, 그리고 재고 수준을 사용했습니다." },
+      { id: "seg-07", startSec: 160, endSec: 209, text: "이 데이터를 바탕으로 두 가지 방식의 예측 모델을 만들어 봤습니다." },
+      { id: "sec-model", startSec: 210, endSec: 245, text: "ARIMA와 LightGBM을 비교해 봤는데 LightGBM이 더 잘 나와서 최종적으로 LightGBM을 선택했습니다." },
+      { id: "seg-09", startSec: 246, endSec: 309, text: "실제로 지난 한 달 동안 예측대로 준비했다면 어땠을지 날짜별로 되짚어 봤습니다." },
+      { id: "sec-conclusion", startSec: 310, endSec: 340, text: "정리하자면 여러 측면에서 개선이 있었고, 참고로 폐기 비용으로 환산하면 월 18만 원 정도 줄어드는 효과도 기대할 수 있습니다." },
+      { id: "seg-11", startSec: 340, endSec: 372, text: "그래서 다음 달부터 2주 동안 시범 운영을 해 보는 것을 제안드립니다. 감사합니다." },
+    ],
+  },
+  presentationMap: {
+    sections: [
+      {
+        id: "map-problem",
+        title: "문제 제기",
+        startSec: 0,
+        endSec: 47,
+        summary: "마감 후 버려지는 재료 사진으로 폐기 문제를 보여줘요.",
+        segmentIds: ["seg-01", "seg-02"],
+        difficultSectionIds: [],
+      },
+      {
+        id: "map-result",
+        title: "성과 수치",
+        startSec: 48,
+        endSec: 95,
+        summary: "새 예측 모델이 기존보다 낫다는 결과를 먼저 제시해요.",
+        segmentIds: ["sec-metric", "seg-04"],
+        difficultSectionIds: ["sec-metric"],
+      },
+      {
+        id: "map-method",
+        title: "예측 방법",
+        startSec: 96,
+        endSec: 245,
+        summary: "쓴 데이터와 변수, 모델을 고른 과정을 설명해요.",
+        segmentIds: ["seg-05", "sec-features", "seg-07", "sec-model"],
+        difficultSectionIds: ["sec-features", "sec-model"],
+      },
+      {
+        id: "map-close",
+        title: "결론과 제안",
+        startSec: 246,
+        endSec: 372,
+        summary: "절감 효과를 정리하고 2주 시범 운영을 제안해요.",
+        segmentIds: ["seg-09", "sec-conclusion", "seg-11"],
+        difficultSectionIds: ["sec-conclusion"],
+      },
+    ],
+  },
+  audienceHeatmap: {
+    cells: [
+      { sectionId: "map-problem", personaId: "p-beginner", reception: "clear", evidence: "버려진 우유 사진을 보니 바로 이해됐어요." },
+      { sectionId: "map-problem", personaId: "p-peer", reception: "clear", evidence: "문제가 무엇인지 첫 30초에 잡혔어요." },
+      { sectionId: "map-problem", personaId: "p-expert", reception: "clear", evidence: "한 달 열흘이라는 빈도가 문제 규모를 보여줬어요." },
+      { sectionId: "map-result", personaId: "p-beginner", reception: "lost", evidence: "MAPE가 뭔지 몰라서 12.4%가 좋은 건지 판단할 수 없었어요." },
+      { sectionId: "map-result", personaId: "p-peer", reception: "partial", evidence: "숫자는 들었는데 우리 가게에 어떤 의미인지 연결이 안 됐어요." },
+      { sectionId: "map-result", personaId: "p-expert", reception: "clear", evidence: "익숙한 지표라 바로 이해했어요. 기준선만 궁금했어요." },
+      { sectionId: "map-method", personaId: "p-beginner", reception: "lost", evidence: "‘이동평균’에서 멈췄고, 그 뒤는 거의 흘려들었어요." },
+      { sectionId: "map-method", personaId: "p-peer", reception: "partial", evidence: "변수를 하나하나 듣다가 무엇이 중요한지 놓쳤어요." },
+      { sectionId: "map-method", personaId: "p-expert", reception: "partial", evidence: "어떤 기간으로 검증했는지 없이 결론만 들렸어요." },
+      { sectionId: "map-close", personaId: "p-beginner", reception: "clear", evidence: "2주 시범 운영 제안은 확실히 들었어요." },
+      { sectionId: "map-close", personaId: "p-peer", reception: "partial", evidence: "가장 궁금했던 금액이 ‘참고로’ 뒤에 묻혀서 지나갔어요." },
+      { sectionId: "map-close", personaId: "p-expert", reception: "clear", evidence: "다음 단계가 현실적이라 납득됐어요." },
+    ],
+  },
+  discovery: {
+    headline: "같은 ‘12.4% 개선’을 두고 전문가는 바로 이해했지만, 비전공 관중은 좋은 숫자인지조차 판단하지 못했어요.",
+    detail: "지표 이름 대신 ‘하루에 몇 개 덜 버리는지’로 바꿔 말하면 세 관중이 같은 결론에 도착할 수 있어요.",
+    sectionId: "map-result",
+    difficultSectionId: "sec-metric",
+    personaIds: ["p-expert", "p-beginner"],
+  },
 };
 
 /** A result where the audience followed everything — exercises the empty state. */
@@ -216,4 +295,20 @@ export const SAMPLE_RESULT_NO_ISSUES: AnalysisResult = {
   difficultSections: [],
   missingExplanations: [],
   exampleSuggestions: [],
+  presentationMap: {
+    sections: SAMPLE_RESULT.presentationMap!.sections.map((s) => ({ ...s, difficultSectionIds: [] })),
+  },
+  audienceHeatmap: {
+    cells: SAMPLE_RESULT.audienceHeatmap!.cells.map((c) => ({ ...c, reception: "clear" as const, evidence: undefined })),
+  },
+  discovery: undefined,
+};
+
+/** Phase 3 shape: no presentation map, heatmap or discovery. Legacy results must still read well. */
+export const SAMPLE_RESULT_LEGACY: AnalysisResult = {
+  ...SAMPLE_RESULT,
+  presentationId: "demo-legacy",
+  presentationMap: undefined,
+  audienceHeatmap: undefined,
+  discovery: undefined,
 };
