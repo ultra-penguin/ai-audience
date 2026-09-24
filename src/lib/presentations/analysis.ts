@@ -193,7 +193,7 @@ async function callPersonaModel(model: JsonLanguageModelProvider, persona: Fixed
   const user = `다음 Transcript만 근거로 분석하세요. 제목, 파일명, 음성 메타데이터 또는 Transcript 밖의 정보를 추측하지 마세요. Transcript에 영어가 있더라도 결과 JSON의 설명 문장은 모두 한국어로 작성하세요.\n\nTranscript:\n${transcript}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} Your previous response was malformed; produce a fresh valid object matching the shape exactly.`, user });
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} Your previous response was malformed; produce a fresh valid object matching the shape exactly.`, user, maxCompletionTokens: 700 });
       return validateKoreanPersona(llmPersonaResponseSchema.parse(parseJsonContent(raw)));
     } catch (error) {
       if (error instanceof ProviderError) throw error;
@@ -313,7 +313,7 @@ async function callStructureModel(model: JsonLanguageModelProvider, segments: Tr
   const user = `다음 발표 transcript를 구조적으로 나누세요. 점수나 평가를 만들지 마세요.\n\n${numberedTranscript(segments)}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user, maxCompletionTokens: 450 });
       const parsed = parseJsonContent(raw);
       const structure = structureModelResponseSchema.safeParse(parsed);
       if (structure.success) return { structure: validateKoreanStructure(structure.data) };
@@ -337,7 +337,7 @@ understanding은 followed, partly_lost, lost 중 하나이며 점수는 0에서 
   const user = `다음 구간만 근거로 ${persona.name}의 관점에서 분석하세요.\n\n${JSON.stringify(excerpts)}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user, maxCompletionTokens: 950 });
       const parsed = parseJsonContent(raw);
       const result = sectionModelResponseSchema.safeParse(parsed);
       if (result.success) return validateKoreanSection(result.data);
@@ -358,7 +358,7 @@ personaIds는 beginner, peer, specialist 중 하나만 사용하세요.`;
   const user = `발표 구조:\n${JSON.stringify(structure)}\n\n구간별 관중 분석:\n${JSON.stringify(analyses)}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user, maxCompletionTokens: 650 });
       const parsed = parseJsonContent(raw);
       const synthesis = synthesisModelResponseSchema.safeParse(parsed);
       if (synthesis.success) return validateKoreanSynthesis(synthesis.data);

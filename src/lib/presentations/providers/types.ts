@@ -18,6 +18,8 @@ export interface SpeechToTextProvider {
 export type JsonLanguageModelRequest = {
   system: string;
   user: string;
+  /** Hard cap for provider output so one analysis cannot exhaust the free-tier token window. */
+  maxCompletionTokens?: number;
 };
 
 export interface JsonLanguageModelProvider {

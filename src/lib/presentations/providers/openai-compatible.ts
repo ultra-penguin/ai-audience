@@ -17,6 +17,28 @@ function asFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function retryAfterMilliseconds(response: Response): number | null {
+  const retryAfter = response.headers.get("retry-after")?.trim();
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  }
+
+  const reset = response.headers.get("x-ratelimit-reset-tokens")?.trim();
+  if (!reset) return null;
+  const match = reset.match(/^(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)?(?:(\d+(?:\.\d+)?)ms)?$/i);
+  if (!match) return null;
+  const hours = Number(match[1] ?? 0);
+  const minutes = Number(match[2] ?? 0);
+  const seconds = Number(match[3] ?? 0);
+  const milliseconds = Number(match[4] ?? 0);
+  return (hours * 3_600 + minutes * 60 + seconds) * 1000 + milliseconds;
+}
+
 function safeProviderMessage(kind: "speech-to-text" | "language-model", status?: number): string {
   if (status === 429) return "The analysis provider is rate limited. Please try again later.";
   if (status === 401 || status === 403) return `The ${kind} provider rejected the configured credentials.`;
@@ -42,18 +64,28 @@ async function fetchWithTimeout(
   timeoutMs: number,
   kind: "speech-to-text" | "language-model",
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } catch (cause) {
-    if (cause instanceof DOMException && cause.name === "AbortError") {
-      throw new ProviderError("analysis_timeout", `The ${kind} provider timed out.`);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(input, { ...init, signal: controller.signal });
+      if (response.status !== 429 || attempt === 1) return response;
+
+      const waitMs = retryAfterMilliseconds(response);
+      // A daily quota can advertise a very long reset. Do not hold the request open;
+      // return the provider error so the UI can offer a safe manual retry instead.
+      if (waitMs === null || waitMs > 15_000) return response;
+      await sleep(waitMs);
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "AbortError") {
+        throw new ProviderError("analysis_timeout", `The ${kind} provider timed out.`);
+      }
+      throw new ProviderError("analysis_provider_error", `The ${kind} provider could not be reached.`, { cause });
+    } finally {
+      clearTimeout(timeout);
     }
-    throw new ProviderError("analysis_provider_error", `The ${kind} provider could not be reached.`, { cause });
-  } finally {
-    clearTimeout(timeout);
   }
+  throw new ProviderError("analysis_rate_limited", "The analysis provider is rate limited. Please try again later.");
 }
 
 function bytesToBlob(audio: Uint8Array, metadata: AudioMetadata): Blob {
@@ -129,6 +161,7 @@ export class OpenAICompatibleLanguageModelProvider implements JsonLanguageModelP
             { role: "system", content: input.system },
             { role: "user", content: input.user },
           ],
+          ...(input.maxCompletionTokens ? { max_completion_tokens: input.maxCompletionTokens } : {}),
         }),
       },
       this.options.timeoutMs,
