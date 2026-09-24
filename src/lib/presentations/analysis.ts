@@ -170,13 +170,30 @@ function parseJsonContent(raw: string): unknown {
   return JSON.parse(trimmed);
 }
 
+function requireKoreanStrings(values: string[]): void {
+  if (values.some((value) => value.trim() && !/[가-힣]/.test(value))) {
+    throw new Error("분석 문자열이 한국어가 아닙니다.");
+  }
+}
+
+function validateKoreanPersona(response: LlmPersonaResponse): LlmPersonaResponse {
+  requireKoreanStrings([
+    response.reaction,
+    ...response.blockers,
+    ...response.questions,
+    ...response.missingExplanations,
+    ...response.improvements.flatMap((improvement) => [improvement.title, improvement.problem, improvement.action, improvement.example]),
+  ]);
+  return response;
+}
+
 async function callPersonaModel(model: JsonLanguageModelProvider, persona: FixedPersona, transcript: string): Promise<LlmPersonaResponse> {
   const system = `당신은 발표 리뷰 서비스의 ${persona.name}입니다. 실제 인간이라고 주장하지 말고, 하나의 고정된 관중 관점으로만 평가하세요. ${persona.instructions} 출력은 반드시 한국어로만 작성해야 합니다. ${JSON_INSTRUCTIONS}`;
   const user = `다음 Transcript만 근거로 분석하세요. 제목, 파일명, 음성 메타데이터 또는 Transcript 밖의 정보를 추측하지 마세요. Transcript에 영어가 있더라도 결과 JSON의 설명 문장은 모두 한국어로 작성하세요.\n\nTranscript:\n${transcript}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} Your previous response was malformed; produce a fresh valid object matching the shape exactly.`, user });
-      return llmPersonaResponseSchema.parse(parseJsonContent(raw));
+      return validateKoreanPersona(llmPersonaResponseSchema.parse(parseJsonContent(raw)));
     } catch (error) {
       if (error instanceof ProviderError) throw error;
       if (attempt === 1) throw new ProviderError("analysis_invalid_output", "The language-model provider returned invalid analysis data.", { cause: error });
@@ -196,6 +213,11 @@ const structureModelResponseSchema = z.object({
 }).strict();
 type StructureModelResponse = z.infer<typeof structureModelResponseSchema>;
 
+function validateKoreanStructure(response: StructureModelResponse): StructureModelResponse {
+  requireKoreanStrings(response.sections.flatMap((section) => [section.title, section.summary]));
+  return response;
+}
+
 const sectionModelResponseSchema = z.object({
   overallReaction: z.string().min(1),
   sections: z.array(z.object({
@@ -214,6 +236,20 @@ const sectionModelResponseSchema = z.object({
 }).strict();
 type SectionModelResponse = z.infer<typeof sectionModelResponseSchema>;
 
+function validateKoreanSection(response: SectionModelResponse): SectionModelResponse {
+  requireKoreanStrings([
+    response.overallReaction,
+    ...response.sections.flatMap((section) => [
+      section.reaction,
+      section.reason,
+      ...section.blockers,
+      ...section.questions,
+      ...(section.improvement ? [section.improvement.title, section.improvement.problem, section.improvement.action, section.improvement.example] : []),
+    ]),
+  ]);
+  return response;
+}
+
 const synthesisModelResponseSchema = z.object({
   headline: z.string().min(1),
   intendedKeyMessage: z.string().min(1),
@@ -221,6 +257,11 @@ const synthesisModelResponseSchema = z.object({
   discovery: analysisDiscoverySchema,
 }).strict();
 type SynthesisModelResponse = z.infer<typeof synthesisModelResponseSchema>;
+
+function validateKoreanSynthesis(response: SynthesisModelResponse): SynthesisModelResponse {
+  requireKoreanStrings([response.headline, response.intendedKeyMessage, ...response.strengths, response.discovery.title, response.discovery.detail]);
+  return response;
+}
 
 function fallbackStructure(segments: TranscriptSegment[]): StructureSection[] {
   const chunkSize = Math.max(1, Math.ceil(segments.length / Math.min(4, segments.length)));
@@ -271,9 +312,9 @@ async function callStructureModel(model: JsonLanguageModelProvider, segments: Tr
       const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
       const parsed = parseJsonContent(raw);
       const structure = structureModelResponseSchema.safeParse(parsed);
-      if (structure.success) return { structure: structure.data };
+      if (structure.success) return { structure: validateKoreanStructure(structure.data) };
       const legacy = llmPersonaResponseSchema.safeParse(parsed);
-      if (legacy.success) return { legacy: legacy.data };
+      if (legacy.success) return { legacy: validateKoreanPersona(legacy.data) };
       throw new Error("invalid structure response");
     } catch (error) {
       if (error instanceof ProviderError) throw error;
@@ -295,7 +336,7 @@ understanding은 followed, partly_lost, lost 중 하나이며 점수는 0에서 
       const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
       const parsed = parseJsonContent(raw);
       const result = sectionModelResponseSchema.safeParse(parsed);
-      if (result.success) return result.data;
+      if (result.success) return validateKoreanSection(result.data);
       throw new Error("invalid section response");
     } catch (error) {
       if (error instanceof ProviderError) throw error;
@@ -315,7 +356,7 @@ async function callSynthesisModel(model: JsonLanguageModelProvider, structure: S
       const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
       const parsed = parseJsonContent(raw);
       const synthesis = synthesisModelResponseSchema.safeParse(parsed);
-      if (synthesis.success) return synthesis.data;
+      if (synthesis.success) return validateKoreanSynthesis(synthesis.data);
       if (llmPersonaResponseSchema.safeParse(parsed).success) return null;
       throw new Error("invalid synthesis response");
     } catch (error) {
