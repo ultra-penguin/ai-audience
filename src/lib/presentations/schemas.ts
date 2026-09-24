@@ -104,6 +104,8 @@ export const analysisResultSchema = z.object({
     comprehensionScore: z.number().int().min(0).max(100),
     attentionScore: z.number().int().min(0).max(100),
     keyMessageScore: z.number().int().min(0).max(100),
+    intendedKeyMessage: z.string().min(1).optional(),
+    strengths: z.array(z.string().min(1)).max(6).optional(),
   }),
   transcript: z.object({
     text: z.string().min(1),

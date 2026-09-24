@@ -45,18 +45,20 @@ export function toFrontendAnalysisResult(
   const improvementBySegmentId = new Map(
     result.improvements.flatMap((improvement) => improvement.sourceSegmentIds.map((segmentId) => [segmentId, improvement] as const)),
   );
-  const hasSectionEvidence = result.mode === "mock";
+  const hasSectionEvidence = result.mode === "mock" || Boolean(result.sectionAnalyses?.length);
 
   const difficultSections = result.difficultSections.map((section, index) => {
     const segment = sectionBySegmentId.get(section.segmentId) ?? result.transcript.segments[index] ?? result.transcript.segments[0]!;
     const matchingImprovement = improvementBySegmentId.get(section.segmentId);
+    const owningSection = result.structure?.sections.find((candidate) => candidate.segmentIds.includes(section.segmentId));
     const reactions = hasSectionEvidence
-      ? result.personas
-          .filter((persona) => persona.blockers.length > 0)
-          .map((persona) => ({
-            personaId: `p-${persona.id}`,
-            reaction: persona.blockers[0] ?? persona.reaction,
-          }))
+      ? result.sectionAnalyses?.filter((analysis) => analysis.sectionId === owningSection?.id).map((analysis) => ({
+          personaId: `p-${analysis.personaId}`,
+          reaction: analysis.reaction,
+        })) ?? result.personas.filter((persona) => persona.blockers.length > 0).map((persona) => ({
+          personaId: `p-${persona.id}`,
+          reaction: persona.blockers[0] ?? persona.reaction,
+        }))
       : [];
 
     return {
@@ -89,16 +91,20 @@ export function toFrontendAnalysisResult(
     term: text,
     why: "관중이 이 개념에서 이해를 멈출 수 있어요.",
     suggestedExplanation: text,
-    personaIds: personas.map((persona) => persona.id),
+    personaIds: result.sectionAnalyses?.filter((analysis) => analysis.blockers.includes(text)).map((analysis) => `p-${analysis.personaId}`) ?? personas.map((persona) => persona.id),
   }));
 
-  const exampleSuggestions = result.improvements.map((improvement) => ({
-    id: improvement.id,
-    concept: improvement.title,
-    example: improvement.example,
-    personaIds: personas.map((persona) => persona.id),
-    sectionId: improvement.sourceSegmentIds[0],
-  }));
+  const exampleSuggestions = result.improvements.map((improvement) => {
+    const sectionId = result.structure?.sections.find((section) => section.segmentIds.includes(improvement.sourceSegmentIds[0] ?? ""))?.id;
+    const personaIds = result.sectionAnalyses?.filter((analysis) => analysis.sectionId === sectionId).map((analysis) => `p-${analysis.personaId}`);
+    return {
+      id: improvement.id,
+      concept: improvement.title,
+      example: improvement.example,
+      personaIds: personaIds?.length ? personaIds : personas.map((persona) => persona.id),
+      sectionId: improvement.sourceSegmentIds[0],
+    };
+  });
 
   const mapSections = result.structure?.sections.map((section) => {
     const difficultSectionIds = result.difficultSections
@@ -138,9 +144,9 @@ export function toFrontendAnalysisResult(
     isSample: result.mode === "mock",
     summary: {
       headline: result.summary.overview,
-      intendedKeyMessage: result.summary.overview,
+      intendedKeyMessage: result.summary.intendedKeyMessage ?? result.summary.overview,
       priorityFixSectionId: difficultSections[0]?.id,
-      strengths: [],
+      strengths: result.summary.strengths ?? [],
     },
     personas,
     personaFeedback,

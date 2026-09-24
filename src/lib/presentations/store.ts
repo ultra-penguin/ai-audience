@@ -21,6 +21,7 @@ export type StoredPresentation = PresentationCreateInput & {
   id: string;
   status: PresentationStatus;
   stage: AnalysisStage;
+  failedStage: AnalysisStage | null;
   progress: number;
   phase: AnalysisPhase | null;
   currentSectionId: string | null;
@@ -38,7 +39,7 @@ export interface PresentationRepository {
   get(id: string): StoredPresentation | undefined;
   update(
     id: string,
-    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "pipeline" | "result" | "error" | "updatedAt" | "transcript">>,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "failedStage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "pipeline" | "result" | "error" | "updatedAt" | "transcript">>,
   ): StoredPresentation | undefined;
   clear(): void;
 }
@@ -53,6 +54,7 @@ export class InMemoryPresentationRepository implements PresentationRepository {
       id: randomUUID(),
       status: "uploaded",
       stage: "queued",
+      failedStage: null,
       progress: 0,
       phase: null,
       currentSectionId: null,
@@ -74,7 +76,7 @@ export class InMemoryPresentationRepository implements PresentationRepository {
 
   update(
     id: string,
-    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "pipeline" | "result" | "error" | "updatedAt" | "transcript">>,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "failedStage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "pipeline" | "result" | "error" | "updatedAt" | "transcript">>,
   ): StoredPresentation | undefined {
     const record = this.records.get(id);
     if (!record) return undefined;
