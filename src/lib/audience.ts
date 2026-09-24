@@ -45,6 +45,7 @@ export function seatStateFor(stage: AnalysisStage | undefined): SeatState {
     case "listening":
       return "listening";
     case "synthesizing":
+    case "cross_check":
     case "completed":
       return "listened";
     case "failed":

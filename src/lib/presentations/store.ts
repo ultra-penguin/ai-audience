@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AnalysisResult, AnalysisStage, PresentationInput, PresentationResponse, PresentationStatus } from "./schemas";
+import type { AnalysisPhase, AnalysisResult, AnalysisStage, PresentationInput, PresentationResponse, PresentationStatus } from "./schemas";
 
 export type PresentationCreateInput = PresentationInput & {
   /** Retained only in the server-side repository for STT; never included in API responses. */
@@ -11,6 +11,10 @@ export type StoredPresentation = PresentationCreateInput & {
   status: PresentationStatus;
   stage: AnalysisStage;
   progress: number;
+  phase: AnalysisPhase | null;
+  currentSectionId: string | null;
+  currentPersonaId: "beginner" | "peer" | "specialist" | null;
+  message: string | null;
   createdAt: string;
   updatedAt: string;
   result: AnalysisResult | null;
@@ -22,7 +26,7 @@ export interface PresentationRepository {
   get(id: string): StoredPresentation | undefined;
   update(
     id: string,
-    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "result" | "error" | "updatedAt" | "transcript">>,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "result" | "error" | "updatedAt" | "transcript">>,
   ): StoredPresentation | undefined;
   clear(): void;
 }
@@ -38,6 +42,10 @@ export class InMemoryPresentationRepository implements PresentationRepository {
       status: "uploaded",
       stage: "queued",
       progress: 0,
+      phase: null,
+      currentSectionId: null,
+      currentPersonaId: null,
+      message: null,
       createdAt: now,
       updatedAt: now,
       result: null,
@@ -53,7 +61,7 @@ export class InMemoryPresentationRepository implements PresentationRepository {
 
   update(
     id: string,
-    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "result" | "error" | "updatedAt" | "transcript">>,
+    patch: Partial<Pick<StoredPresentation, "status" | "stage" | "progress" | "phase" | "currentSectionId" | "currentPersonaId" | "message" | "result" | "error" | "updatedAt" | "transcript">>,
   ): StoredPresentation | undefined {
     const record = this.records.get(id);
     if (!record) return undefined;

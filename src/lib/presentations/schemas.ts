@@ -6,12 +6,18 @@ export type PresentationStatus = z.infer<typeof presentationStatusSchema>;
 export const analysisStageSchema = z.enum([
   "queued",
   "transcribing",
+  "structuring",
+  "segmenting",
   "evaluating",
+  "cross_check",
   "finalizing",
   "complete",
   "failed",
 ]);
 export type AnalysisStage = z.infer<typeof analysisStageSchema>;
+
+export const analysisPhaseSchema = z.enum(["structure", "section", "persona", "cross_check", "synthesis"]);
+export type AnalysisPhase = z.infer<typeof analysisPhaseSchema>;
 
 export const audioMetadataSchema = z.object({
   filename: z.string().min(1),
@@ -52,6 +58,42 @@ export const improvementSchema = z.object({
 });
 export type Improvement = z.infer<typeof improvementSchema>;
 
+export const structureSectionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  startSeconds: z.number().nonnegative(),
+  endSeconds: z.number().positive(),
+  summary: z.string().min(1),
+  segmentIds: z.array(z.string().min(1)).min(1),
+});
+export type StructureSection = z.infer<typeof structureSectionSchema>;
+
+export const sectionAudienceAnalysisSchema = z.object({
+  sectionId: z.string().min(1),
+  personaId: z.enum(["beginner", "peer", "specialist"]),
+  understanding: z.enum(["followed", "partly_lost", "lost"]),
+  comprehensionScore: z.number().int().min(0).max(100),
+  attentionScore: z.number().int().min(0).max(100),
+  reaction: z.string().min(1),
+  evidence: z.string().min(1),
+  reason: z.string().min(1),
+  blockers: z.array(z.string().min(1)).max(6),
+  questions: z.array(z.string().min(1)).max(6),
+  needsExample: z.boolean(),
+  improvement: improvementSchema.omit({ id: true, sourceSegmentIds: true }).nullable(),
+});
+export type SectionAudienceAnalysis = z.infer<typeof sectionAudienceAnalysisSchema>;
+
+export const analysisDiscoverySchema = z.object({
+  kind: z.enum(["common", "split"]),
+  title: z.string().min(1),
+  detail: z.string().min(1),
+  sectionId: z.string().min(1).optional(),
+  personaIds: z.array(z.enum(["beginner", "peer", "specialist"])),
+  evidence: z.string().min(1).optional(),
+});
+export type AnalysisDiscovery = z.infer<typeof analysisDiscoverySchema>;
+
 export const analysisResultSchema = z.object({
   version: z.literal("1.0"),
   mode: z.enum(["mock", "provider"]),
@@ -74,6 +116,9 @@ export const analysisResultSchema = z.object({
   })),
   missingExplanations: z.array(z.string().min(1)),
   improvements: z.array(improvementSchema),
+  structure: z.object({ sections: z.array(structureSectionSchema).min(1).max(12) }).optional(),
+  sectionAnalyses: z.array(sectionAudienceAnalysisSchema).optional(),
+  discovery: analysisDiscoverySchema.optional(),
 });
 export type AnalysisResult = z.infer<typeof analysisResultSchema>;
 

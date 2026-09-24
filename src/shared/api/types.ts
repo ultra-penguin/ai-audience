@@ -82,7 +82,10 @@ export type CreatePresentationResponse = z.infer<typeof CreatePresentationRespon
 export const AnalysisStageSchema = z.enum([
   "queued",
   "transcribing",
+  "structuring",
+  "segmenting",
   "listening", // personas "listen" to the transcript
+  "cross_check",
   "synthesizing", // difficult points, reasons and repairs are assembled
   "completed",
   "failed",
@@ -98,6 +101,10 @@ export const AnalysisStatusSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }).nullish(),
   /** Stage that was running when the pipeline failed (only when stage === "failed"). */
   failedStage: AnalysisStageSchema.nullish(),
+  phase: z.enum(["structure", "section", "persona", "cross_check", "synthesis"]).nullish(),
+  sectionId: z.string().nullish(),
+  personaId: z.enum(["beginner", "peer", "specialist"]).nullish(),
+  message: z.string().nullish(),
   updatedAt: z.string(),
 });
 export type AnalysisStatus = z.infer<typeof AnalysisStatusSchema>;
@@ -215,6 +222,41 @@ export const TranscriptSchema = z.object({
 });
 export type Transcript = z.infer<typeof TranscriptSchema>;
 
+export const PresentationMapSectionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  startSec: z.number().min(0),
+  endSec: z.number().min(0),
+  summary: z.string(),
+  segmentIds: z.array(z.string()),
+});
+export type PresentationMapSection = z.infer<typeof PresentationMapSectionSchema>;
+
+export const SectionAudienceAnalysisSchema = z.object({
+  sectionId: z.string(),
+  personaId: z.string(),
+  understanding: UnderstandingSchema,
+  comprehensionScore: z.number().int().min(0).max(100),
+  attentionScore: z.number().int().min(0).max(100),
+  reaction: z.string(),
+  evidence: z.string(),
+  reason: z.string(),
+  blockers: z.array(z.string()),
+  questions: z.array(z.string()),
+  needsExample: z.boolean(),
+});
+export type SectionAudienceAnalysis = z.infer<typeof SectionAudienceAnalysisSchema>;
+
+export const AnalysisDiscoverySchema = z.object({
+  kind: z.enum(["common", "split"]),
+  title: z.string(),
+  detail: z.string(),
+  sectionId: z.string().optional(),
+  personaIds: z.array(z.string()),
+  evidence: z.string().optional(),
+});
+export type AnalysisDiscovery = z.infer<typeof AnalysisDiscoverySchema>;
+
 export const AnalysisResultSchema = z.object({
   presentationId: z.string(),
   title: z.string(),
@@ -229,5 +271,8 @@ export const AnalysisResultSchema = z.object({
   missingExplanations: z.array(MissingExplanationSchema),
   exampleSuggestions: z.array(ExampleSuggestionSchema),
   transcript: TranscriptSchema.optional(),
+  presentationMap: z.array(PresentationMapSectionSchema).optional(),
+  sectionAnalyses: z.array(SectionAudienceAnalysisSchema).optional(),
+  discovery: AnalysisDiscoverySchema.optional(),
 });
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;

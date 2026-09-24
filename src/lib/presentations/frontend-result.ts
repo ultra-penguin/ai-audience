@@ -126,5 +126,27 @@ export function toFrontendAnalysisResult(
         text: segment.text,
       })),
     },
+    presentationMap: result.structure?.sections.map((section) => ({
+      id: section.id,
+      title: section.title,
+      startSec: section.startSeconds,
+      endSec: section.endSeconds,
+      summary: section.summary,
+      segmentIds: section.segmentIds,
+    })),
+    sectionAnalyses: result.sectionAnalyses?.map((analysis) => ({
+      sectionId: analysis.sectionId,
+      personaId: `p-${analysis.personaId}`,
+      understanding: analysis.understanding,
+      comprehensionScore: analysis.comprehensionScore,
+      attentionScore: analysis.attentionScore,
+      reaction: analysis.reaction,
+      evidence: analysis.evidence,
+      reason: analysis.reason,
+      blockers: analysis.blockers,
+      questions: analysis.questions,
+      needsExample: analysis.needsExample,
+    })),
+    discovery: result.discovery,
   });
 }

@@ -85,7 +85,7 @@ describe("real analysis provider", () => {
         audioBytes: new Uint8Array([1]),
       },
     });
-    expect([...calls.values()]).toEqual([2, 2, 2]);
+    expect([...calls.values()]).toEqual([2, 2, 2, 2]);
     expect(result.personas).toHaveLength(3);
   });
 

@@ -17,7 +17,10 @@ import { cn } from "@/lib/utils";
 const PIPELINE: { stage: AnalysisStage; label: string; detail: string }[] = [
   { stage: "queued", label: "녹음 받기", detail: "업로드한 녹음을 확인하고 있어요." },
   { stage: "transcribing", label: "말한 내용 옮겨 적기", detail: "발표 음성을 문장 단위로 옮겨 적고 있어요." },
+  { stage: "structuring", label: "발표 구조 파악", detail: "도입·핵심 내용·마무리가 어떻게 이어지는지 살펴보고 있어요." },
+  { stage: "segmenting", label: "핵심 구간 나누기", detail: "관중이 다르게 받아들일 수 있는 구간을 나누고 있어요." },
   { stage: "listening", label: "관중이 듣는 중", detail: "각 관중이 자기 관점에서 발표를 따라가고 있어요." },
+  { stage: "cross_check", label: "관중 의견 비교", detail: "공통으로 막힌 곳과 관중별 차이를 비교하고 있어요." },
   { stage: "synthesizing", label: "막힌 지점 정리", detail: "어디서, 왜 막혔는지와 고칠 방법을 정리하고 있어요." },
 ];
 
@@ -25,7 +28,10 @@ const PIPELINE: { stage: AnalysisStage; label: string; detail: string }[] = [
 const AUDIENCE_CAPTION: Record<AnalysisStage, string> = {
   queued: "녹음은 도착했어요. 관중이 듣기 전에 발표를 준비하고 있어요.",
   transcribing: "관중은 발표를 기다리고 있어요. 음성을 먼저 문장으로 정리하고 있어요.",
+  structuring: "발표의 도입·핵심 내용·마무리 구조를 읽고 있어요.",
+  segmenting: "분석할 핵심 구간을 나누고 있어요.",
   listening: "세 관중이 각자의 시선으로 발표를 듣고 있어요.",
+  cross_check: "관중들의 반응이 같은지, 달랐는지 비교하고 있어요.",
   synthesizing: "관중이 다 들었어요. 어디서 왜 막혔는지 정리하고 있어요.",
   completed: "관중이 다 들었어요. 결과를 정리했어요.",
   failed: "분석이 중간에 멈췄어요.",

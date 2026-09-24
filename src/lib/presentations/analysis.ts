@@ -1,7 +1,17 @@
 import { z } from "zod";
 import { ApiError } from "./errors";
 import { presentationRepository, type StoredPresentation } from "./store";
-import { analysisResultSchema, type AnalysisResult, type TranscriptSegment } from "./schemas";
+import {
+  analysisDiscoverySchema,
+  analysisResultSchema,
+  sectionAudienceAnalysisSchema,
+  structureSectionSchema,
+  type AnalysisDiscovery,
+  type AnalysisResult,
+  type SectionAudienceAnalysis,
+  type StructureSection,
+  type TranscriptSegment,
+} from "./schemas";
 import {
   createConfiguredProviders,
   ProviderError,
@@ -14,9 +24,12 @@ import {
 export interface PresentationAnalysisProvider {
   analyze(input: {
     presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">;
-    onStage?: (stage: "transcribing" | "evaluating" | "finalizing") => void;
+    onStage?: (stage: ProgressStage, context?: ProgressContext) => void;
   }): Promise<AnalysisResult>;
 }
+
+type ProgressStage = "transcribing" | "structuring" | "segmenting" | "evaluating" | "cross_check" | "finalizing";
+type ProgressContext = { phase: "structure" | "section" | "persona" | "cross_check" | "synthesis"; sectionId?: string; personaId?: "beginner" | "peer" | "specialist"; message: string };
 
 type FixedPersona = {
   id: "beginner" | "peer" | "specialist";
@@ -63,10 +76,12 @@ function neutralSegments(text: string): TranscriptSegment[] {
 }
 
 export class MockPresentationAnalysisProvider implements PresentationAnalysisProvider {
-  async analyze({ presentation, onStage }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">; onStage?: (stage: "transcribing" | "evaluating" | "finalizing") => void }): Promise<AnalysisResult> {
-    onStage?.("evaluating");
+  async analyze({ presentation, onStage }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">; onStage?: (stage: ProgressStage, context?: ProgressContext) => void }): Promise<AnalysisResult> {
+    onStage?.("structuring", { phase: "structure", message: "발표의 흐름을 살펴보고 있어요." });
     const text = presentation.transcript?.trim() || SAMPLE_TRANSCRIPT;
     const segments = sentenceSegments(text);
+    onStage?.("segmenting", { phase: "section", sectionId: segments[Math.min(1, segments.length - 1)]!.id, message: "발표를 핵심 구간으로 나누고 있어요." });
+    onStage?.("evaluating", { phase: "persona", message: "세 관중의 관점에서 발표를 비교하고 있어요." });
     const result = analysisResultSchema.parse({
       version: "1.0", mode: "mock", disclaimer: "Sample/mock analysis for development only; this is not real AI feedback.", generatedAt: new Date().toISOString(),
       summary: { overview: "The main idea is promising, but one important concept would benefit from a concrete example before the live presentation.", comprehensionScore: 72, attentionScore: 78, keyMessageScore: 68 },
@@ -83,7 +98,8 @@ export class MockPresentationAnalysisProvider implements PresentationAnalysisPro
         { id: "improvement-2", title: "Explain how to prioritize feedback", problem: "The final recommendation does not tell the presenter which issue to fix first.", action: "State that repeated comprehension blockers come before stylistic refinements.", example: "Start with the concept that both beginner and peer listeners found unclear.", sourceSegmentIds: [segments[Math.min(2, segments.length - 1)]!.id] },
       ],
     });
-    onStage?.("finalizing");
+    onStage?.("cross_check", { phase: "cross_check", message: "관중들의 반응이 갈린 지점을 확인하고 있어요." });
+    onStage?.("finalizing", { phase: "synthesis", message: "발표자가 고칠 수 있는 인사이트를 정리하고 있어요." });
     return result;
   }
 }
@@ -96,9 +112,10 @@ const llmPersonaResponseSchema = z.object({
 type LlmPersonaResponse = z.infer<typeof llmPersonaResponseSchema>;
 
 const JSON_INSTRUCTIONS = `반드시 한국어로만 답하세요. JSON의 모든 문자열 값(reaction, blockers, questions, missingExplanations, improvements의 title/problem/action/example)은 자연스러운 한국어여야 합니다. 영어, 한국어와 영어의 혼용, 영어 문장, 로마자 설명을 사용하지 마세요. 고유명사나 제품명처럼 번역할 수 없는 용어만 원문 표기를 허용합니다. Transcript에 영어가 포함되어 있어도 평가와 개선안은 한국어로 작성하세요.
-Return only one valid JSON object with this exact shape. Do not use markdown fences or extra text:
+아래 모양의 JSON 객체 하나만 반환하세요. 마크다운 코드 펜스나 JSON 바깥의 설명을 붙이지 마세요:
 {"comprehensionScore":0,"attentionScore":0,"reaction":"string","blockers":["string"],"questions":["string"],"focusSegmentIndexes":[0],"missingExplanations":["string"],"improvements":[{"title":"string","problem":"string","action":"string","example":"string","segmentIndex":0}]}
-Scores are integers from 0 to 100. focusSegmentIndexes and segmentIndex refer to the numbered transcript sentences, starting at 0. Keep every observation grounded in the transcript.`;
+점수는 0에서 100 사이의 정수여야 합니다. focusSegmentIndexes와 segmentIndex는 0부터 시작하는 transcript 문장 번호입니다. 모든 판단은 transcript에 근거하세요.`;
+const KOREAN_JSON_RULE = "모든 문자열 값은 자연스러운 한국어로 작성하세요. Transcript에 영어가 포함되어 있어도 구조 설명과 분석 문장은 한국어로 작성하세요. JSON 외의 설명, 마크다운, 영어 문장을 반환하지 마세요.";
 
 function parseJsonContent(raw: string): unknown {
   const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -118,6 +135,245 @@ async function callPersonaModel(model: JsonLanguageModelProvider, persona: Fixed
     }
   }
   throw new ProviderError("analysis_invalid_output", "The language-model provider returned invalid analysis data.");
+}
+
+const structureModelResponseSchema = z.object({
+  sections: z.array(z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    startSegmentIndex: z.number().int().min(0).max(1000),
+    endSegmentIndex: z.number().int().min(0).max(1000),
+    summary: z.string().min(1),
+  })).min(1).max(12),
+}).strict();
+type StructureModelResponse = z.infer<typeof structureModelResponseSchema>;
+
+const sectionModelResponseSchema = z.object({
+  overallReaction: z.string().min(1),
+  sections: z.array(z.object({
+    sectionId: z.string().min(1),
+    understanding: z.enum(["followed", "partly_lost", "lost"]),
+    comprehensionScore: z.number().int().min(0).max(100),
+    attentionScore: z.number().int().min(0).max(100),
+    reaction: z.string().min(1),
+    evidence: z.string().min(1),
+    reason: z.string().min(1),
+    blockers: z.array(z.string().min(1)).max(6),
+    questions: z.array(z.string().min(1)).max(6),
+    needsExample: z.boolean(),
+    improvement: z.object({ title: z.string().min(1), problem: z.string().min(1), action: z.string().min(1), example: z.string().min(1) }).nullable(),
+  })).min(1).max(12),
+}).strict();
+type SectionModelResponse = z.infer<typeof sectionModelResponseSchema>;
+
+const synthesisModelResponseSchema = z.object({
+  headline: z.string().min(1),
+  intendedKeyMessage: z.string().min(1),
+  strengths: z.array(z.string().min(1)).max(6),
+  discovery: analysisDiscoverySchema,
+}).strict();
+type SynthesisModelResponse = z.infer<typeof synthesisModelResponseSchema>;
+
+function fallbackStructure(segments: TranscriptSegment[]): StructureSection[] {
+  const chunkSize = Math.max(1, Math.ceil(segments.length / Math.min(4, segments.length)));
+  return Array.from({ length: Math.ceil(segments.length / chunkSize) }, (_, index) => {
+    const slice = segments.slice(index * chunkSize, (index + 1) * chunkSize);
+    return {
+      id: `section-${index + 1}`,
+      title: index === 0 ? "도입" : index === Math.ceil(segments.length / chunkSize) - 1 ? "마무리" : `핵심 구간 ${index}`,
+      startSeconds: slice[0]!.startSeconds,
+      endSeconds: slice[slice.length - 1]!.endSeconds,
+      summary: "발표 transcript의 연속된 구간",
+      segmentIds: slice.map((segment) => segment.id),
+    } satisfies StructureSection;
+  });
+}
+
+function normaliseStructure(model: StructureModelResponse, segments: TranscriptSegment[]): StructureSection[] {
+  const byIndex = (index: number) => segments[Math.max(0, Math.min(segments.length - 1, index))]!;
+  const sections = model.sections
+    .map((section, index) => {
+      const start = byIndex(Math.min(section.startSegmentIndex, section.endSegmentIndex));
+      const end = byIndex(Math.max(section.startSegmentIndex, section.endSegmentIndex));
+      return {
+        id: section.id.trim() || `section-${index + 1}`,
+        title: section.title.trim(),
+        startSeconds: start.startSeconds,
+        endSeconds: Math.max(start.endSeconds, end.endSeconds),
+        summary: section.summary.trim(),
+        segmentIds: segments.filter((segment) => segment.startSeconds >= start.startSeconds && segment.startSeconds <= end.startSeconds).map((segment) => segment.id),
+      } satisfies StructureSection;
+    })
+    .filter((section) => section.title && section.summary && section.segmentIds.length > 0);
+  return sections.length > 0 ? sections : fallbackStructure(segments);
+}
+
+function numberedTranscript(segments: TranscriptSegment[]): string {
+  return segments.map((segment, index) => `[${index}] ${segment.text}`).join("\n");
+}
+
+async function callStructureModel(model: JsonLanguageModelProvider, segments: TranscriptSegment[]): Promise<{ structure?: StructureModelResponse; legacy?: LlmPersonaResponse }> {
+  const system = `당신은 발표 구조 분석기입니다. 발표의 좋고 나쁨, 점수, 개선안, 관중 평가는 하지 마세요. 오직 발표가 어떤 구간으로 구성되어 있는지만 찾아야 합니다. ${KOREAN_JSON_RULE}
+Return only this JSON shape:
+{"sections":[{"id":"intro","title":"도입","startSegmentIndex":0,"endSegmentIndex":1,"summary":"발표 주제와 문제 상황 소개"}]}
+구간은 transcript의 문장 번호를 사용하고 서로 겹치지 않게 하세요. 최대 8개로 나누세요.`;
+  const user = `다음 발표 transcript를 구조적으로 나누세요. 점수나 평가를 만들지 마세요.\n\n${numberedTranscript(segments)}`;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
+      const parsed = parseJsonContent(raw);
+      const structure = structureModelResponseSchema.safeParse(parsed);
+      if (structure.success) return { structure: structure.data };
+      const legacy = llmPersonaResponseSchema.safeParse(parsed);
+      if (legacy.success) return { legacy: legacy.data };
+      throw new Error("invalid structure response");
+    } catch (error) {
+      if (error instanceof ProviderError) throw error;
+      if (attempt === 1) throw new ProviderError("analysis_invalid_output", "The structure analyzer returned invalid analysis data.", { cause: error });
+    }
+  }
+  throw new ProviderError("analysis_invalid_output", "The structure analyzer returned invalid analysis data.");
+}
+
+async function callSectionPersonaModel(model: JsonLanguageModelProvider, persona: FixedPersona, structure: StructureSection[], segments: TranscriptSegment[]): Promise<SectionModelResponse> {
+  const excerpts = structure.map((section) => ({ sectionId: section.id, title: section.title, summary: section.summary, transcript: section.segmentIds.map((id) => segments.find((segment) => segment.id === id)?.text ?? "").join(" ") }));
+  const system = `당신은 ${persona.name} 관점의 발표 관중 시뮬레이터입니다. ${persona.instructions} 전체 발표를 한 번에 점수화하지 말고, 주어진 구간마다 실제 transcript 근거를 찾아 평가하세요. 실제 인간이라고 주장하지 말고, 관중 관점의 시뮬레이션임을 유지하세요. ${KOREAN_JSON_RULE}
+Return only this JSON shape:
+{"overallReaction":"전체적으로 들은 느낌","sections":[{"sectionId":"intro","understanding":"followed","comprehensionScore":0,"attentionScore":0,"reaction":"관중의 한 문장 반응","evidence":"근거가 된 transcript 문장","reason":"그렇게 느낀 이유","blockers":[],"questions":[],"needsExample":false,"improvement":null}]}
+understanding은 followed, partly_lost, lost 중 하나이며 점수는 0에서 100 사이입니다.`;
+  const user = `다음 구간만 근거로 ${persona.name}의 관점에서 분석하세요.\n\n${JSON.stringify(excerpts)}`;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
+      const parsed = parseJsonContent(raw);
+      const result = sectionModelResponseSchema.safeParse(parsed);
+      if (result.success) return result.data;
+      throw new Error("invalid section response");
+    } catch (error) {
+      if (error instanceof ProviderError) throw error;
+      if (attempt === 1) throw new ProviderError("analysis_invalid_output", "The section analyzer returned invalid analysis data.", { cause: error });
+    }
+  }
+  throw new ProviderError("analysis_invalid_output", "The section analyzer returned invalid analysis data.");
+}
+
+async function callSynthesisModel(model: JsonLanguageModelProvider, structure: StructureSection[], analyses: SectionAudienceAnalysis[]): Promise<SynthesisModelResponse | null> {
+  const system = `당신은 발표 분석 통합기입니다. 구간별 관중 분석을 비교해 발표자가 먼저 고칠 한 가지를 찾으세요. 하위 분석에 없는 사실을 추가하지 마세요. 점수보다 관중 차이와 transcript 근거를 우선하세요. ${KOREAN_JSON_RULE}
+Return only this JSON shape:
+{"headline":"핵심 총평 한 문장","intendedKeyMessage":"발표자가 전달하려 한 핵심 메시지","strengths":["잘 전달된 점"],"discovery":{"kind":"common","title":"가장 큰 발견","detail":"발견 설명","sectionId":"intro","personaIds":["beginner"],"evidence":"근거 문장"}}`;
+  const user = `발표 구조:\n${JSON.stringify(structure)}\n\n구간별 관중 분석:\n${JSON.stringify(analyses)}`;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user });
+      const parsed = parseJsonContent(raw);
+      const synthesis = synthesisModelResponseSchema.safeParse(parsed);
+      if (synthesis.success) return synthesis.data;
+      if (llmPersonaResponseSchema.safeParse(parsed).success) return null;
+      throw new Error("invalid synthesis response");
+    } catch (error) {
+      if (error instanceof ProviderError) throw error;
+      if (attempt === 1) throw new ProviderError("analysis_invalid_output", "The cross-check analyzer returned invalid analysis data.", { cause: error });
+    }
+  }
+  throw new ProviderError("analysis_invalid_output", "The cross-check analyzer returned invalid analysis data.");
+}
+
+function discoveryFallback(structure: StructureSection[], analyses: SectionAudienceAnalysis[]): AnalysisDiscovery {
+  const bySection = structure.map((section) => ({ section, items: analyses.filter((analysis) => analysis.sectionId === section.id) }));
+  const common = bySection.find(({ items }) => items.filter((item) => item.understanding !== "followed" || item.needsExample).length >= 2);
+  if (common) {
+    const items = common.items.filter((item) => item.understanding !== "followed" || item.needsExample);
+    return analysisDiscoverySchema.parse({
+      kind: "common",
+      title: "여러 관중이 같은 구간에서 멈췄어요",
+      detail: `${items.length}명의 관중이 ${common.section.title}에서 추가 설명이 필요하다고 판단했습니다.`,
+      sectionId: common.section.id,
+      personaIds: items.map((item) => item.personaId),
+      evidence: items[0]?.evidence,
+    });
+  }
+  const split = bySection.find(({ items }) => {
+    const states = new Set(items.map((item) => item.understanding));
+    return states.size > 1;
+  });
+  if (split) {
+    return analysisDiscoverySchema.parse({
+      kind: "split",
+      title: "관중의 반응이 갈린 구간이 있어요",
+      detail: `${split.section.title}은 배경지식에 따라 이해도가 달라졌습니다.`,
+      sectionId: split.section.id,
+      personaIds: split.items.map((item) => item.personaId),
+      evidence: split.items.find((item) => item.evidence)?.evidence,
+    });
+  }
+  return analysisDiscoverySchema.parse({ kind: "common", title: "핵심 흐름은 대체로 전달됐어요", detail: "관중별 반응을 비교했지만 한 구간에 집중된 큰 차이는 발견되지 않았습니다.", personaIds: [] });
+}
+
+function deepProviderResult(
+  presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds">,
+  transcript: string,
+  segments: TranscriptSegment[],
+  structure: StructureSection[],
+  responses: readonly SectionModelResponse[],
+  synthesis: SynthesisModelResponse | null,
+): AnalysisResult {
+  const sectionAnalyses = responses.flatMap((response, personaIndex) => response.sections.flatMap((section) => {
+    const personaId = FIXED_PERSONAS[personaIndex]!.id;
+    const parsed = sectionAudienceAnalysisSchema.safeParse({ ...section, personaId });
+    return parsed.success ? [parsed.data] : [];
+  }));
+  const discovery = synthesis?.discovery ?? discoveryFallback(structure, sectionAnalyses);
+  const personas = FIXED_PERSONAS.map((persona, index) => {
+    const response = responses[index]!;
+    const items = response.sections;
+    const blockers = uniqueStrings(items.flatMap((item) => item.blockers));
+    const questions = uniqueStrings(items.flatMap((item) => item.questions));
+    return {
+      id: persona.id,
+      name: persona.name,
+      perspective: persona.perspective,
+      comprehensionScore: Math.round(items.reduce((sum, item) => sum + item.comprehensionScore, 0) / Math.max(items.length, 1)),
+      attentionScore: Math.round(items.reduce((sum, item) => sum + item.attentionScore, 0) / Math.max(items.length, 1)),
+      reaction: response.overallReaction,
+      blockers,
+      questions,
+    };
+  });
+  const difficultSections = structure.flatMap((section) => {
+    const items = sectionAnalyses.filter((analysis) => analysis.sectionId === section.id);
+    const focus = items.filter((item) => item.understanding !== "followed" || item.needsExample);
+    if (focus.length === 0) return [];
+    const reactions = focus.map((item) => ({ personaId: `p-${item.personaId}`, reaction: item.reaction }));
+    const suggestion = focus.find((item) => item.improvement)?.improvement;
+    return [{
+      segmentId: section.segmentIds[0]!,
+      reason: focus[0]!.reason,
+      __frontend: { section, reactions, suggestion },
+    }];
+  });
+  const improvements = structure.flatMap((section) => {
+    const item = sectionAnalyses.find((analysis) => analysis.sectionId === section.id && analysis.improvement);
+    if (!item?.improvement) return [];
+    return [{ id: `deep-improvement-${section.id}`, ...item.improvement, sourceSegmentIds: section.segmentIds }];
+  });
+  const comprehensionScore = Math.round(personas.reduce((sum, persona) => sum + persona.comprehensionScore, 0) / personas.length);
+  const attentionScore = Math.round(personas.reduce((sum, persona) => sum + persona.attentionScore, 0) / personas.length);
+  const overview = synthesis?.headline ?? discovery.detail;
+  return analysisResultSchema.parse({
+    version: "1.0",
+    mode: "provider",
+    disclaimer: "Generated from this transcript by the configured STT/LLM provider; feedback is informational.",
+    generatedAt: new Date().toISOString(),
+    summary: { overview, comprehensionScore, attentionScore, keyMessageScore: comprehensionScore },
+    transcript: { text: transcript, segments },
+    personas,
+    difficultSections: difficultSections.map(({ segmentId, reason }) => ({ segmentId, reason })),
+    missingExplanations: uniqueStrings(sectionAnalyses.flatMap((analysis) => analysis.blockers)).slice(0, 12),
+    improvements,
+    structure: { sections: structure },
+    sectionAnalyses,
+    discovery,
+  });
 }
 
 function uniqueStrings(values: string[]): string[] { return [...new Set(values.map((value) => value.trim()).filter(Boolean))]; }
@@ -146,7 +402,7 @@ function providerResult(presentation: Pick<StoredPresentation, "id" | "title" | 
 export class ProviderPresentationAnalysisProvider implements PresentationAnalysisProvider {
   constructor(private readonly speechToText: SpeechToTextProvider, private readonly languageModel: JsonLanguageModelProvider) {}
 
-  async analyze({ presentation, onStage }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">; onStage?: (stage: "transcribing" | "evaluating" | "finalizing") => void }): Promise<AnalysisResult> {
+  async analyze({ presentation, onStage }: { presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds" | "transcript" | "audio" | "audioBytes">; onStage?: (stage: ProgressStage, context?: ProgressContext) => void }): Promise<AnalysisResult> {
     let transcript = presentation.transcript?.trim() ?? "";
     let speechSegments: SpeechToTextResult["segments"];
     if (!transcript) {
@@ -157,11 +413,29 @@ export class ProviderPresentationAnalysisProvider implements PresentationAnalysi
       speechSegments = transcription.segments;
     }
     if (!transcript) throw new ProviderError("analysis_empty_transcript", "The recording did not contain recognizable speech.");
-    onStage?.("evaluating");
     const segments: TranscriptSegment[] = speechSegments?.length ? speechSegments.map((segment, index) => ({ id: `segment-${index + 1}`, startSeconds: Math.max(0, segment.startSeconds), endSeconds: Math.max(segment.startSeconds + 0.1, segment.endSeconds), text: segment.text, difficulty: "low" as const, issue: null })) : neutralSegments(transcript);
-    const responses = await Promise.all(FIXED_PERSONAS.map((persona) => callPersonaModel(this.languageModel, persona, transcript)));
-    onStage?.("finalizing");
-    return providerResult(presentation, transcript, segments, responses);
+    onStage?.("structuring", { phase: "structure", message: "발표가 도입·핵심 내용·마무리로 어떻게 이어지는지 파악하고 있어요." });
+    const structureResponse = await callStructureModel(this.languageModel, segments);
+    if (structureResponse.legacy) {
+      onStage?.("evaluating", { phase: "persona", message: "세 관중의 관점에서 발표를 듣고 있어요." });
+      const responses = await Promise.all(FIXED_PERSONAS.map((persona) => callPersonaModel(this.languageModel, persona, transcript)));
+      onStage?.("cross_check", { phase: "cross_check", message: "관중들의 반응을 비교하고 있어요." });
+      onStage?.("finalizing", { phase: "synthesis", message: "최종 발표 피드백을 정리하고 있어요." });
+      return providerResult(presentation, transcript, segments, responses);
+    }
+
+    const structure = normaliseStructure(structureResponse.structure!, segments);
+    onStage?.("segmenting", { phase: "section", sectionId: structure[0]?.id, message: "발표를 분석할 핵심 구간으로 나누고 있어요." });
+    onStage?.("evaluating", { phase: "persona", message: "비전공·일반·전문가 관중의 관점에서 구간을 분석하고 있어요." });
+    const responses = await Promise.all(FIXED_PERSONAS.map((persona) => callSectionPersonaModel(this.languageModel, persona, structure, segments)));
+    const sectionAnalyses = responses.flatMap((response, personaIndex) => response.sections.flatMap((section) => {
+      const parsed = sectionAudienceAnalysisSchema.safeParse({ ...section, personaId: FIXED_PERSONAS[personaIndex]!.id });
+      return parsed.success ? [parsed.data] : [];
+    }));
+    onStage?.("cross_check", { phase: "cross_check", message: "관중들의 공통 반응과 의견 차이를 교차 검증하고 있어요." });
+    const synthesis = await callSynthesisModel(this.languageModel, structure, sectionAnalyses);
+    onStage?.("finalizing", { phase: "synthesis", message: "발표자가 먼저 고칠 인사이트를 정리하고 있어요." });
+    return deepProviderResult(presentation, transcript, segments, structure, responses, synthesis);
   }
 }
 
@@ -196,19 +470,26 @@ export async function runAnalysis(id: string, provider?: PresentationAnalysisPro
   if (!record) return;
   try {
     const activeProvider = provider ?? getAnalysisProvider();
-    presentationRepository.update(id, { status: "analyzing", stage: "transcribing", progress: 20, error: null });
+    presentationRepository.update(id, { status: "analyzing", stage: "transcribing", progress: 20, phase: null, currentSectionId: null, currentPersonaId: null, message: "음성을 문장으로 옮기고 있어요.", error: null });
     await delay(ANALYSIS_DELAY_MS);
     const current = presentationRepository.get(id);
     if (!current) return;
     const result = await activeProvider.analyze({
       presentation: current,
-      onStage: (stage) => {
-        const progress = stage === "transcribing" ? 20 : stage === "evaluating" ? 60 : 85;
-        presentationRepository.update(id, { stage, progress });
+      onStage: (stage, context) => {
+        const progress = { transcribing: 20, structuring: 35, segmenting: 45, evaluating: 65, cross_check: 82, finalizing: 92 }[stage];
+        presentationRepository.update(id, {
+          stage,
+          progress,
+          phase: context?.phase ?? null,
+          currentSectionId: context?.sectionId ?? null,
+          currentPersonaId: context?.personaId ?? null,
+          message: context?.message ?? null,
+        });
       },
     });
     const validated = analysisResultSchema.parse(result);
-    presentationRepository.update(id, { transcript: validated.transcript.text, status: "complete", stage: "complete", progress: 100, result: validated, error: null });
+    presentationRepository.update(id, { transcript: validated.transcript.text, status: "complete", stage: "complete", progress: 100, phase: null, currentSectionId: null, currentPersonaId: null, message: "분석이 끝났어요.", result: validated, error: null });
   } catch (error) {
     const failure = failureFor(error);
     console.error("Presentation analysis failed", { code: failure.code });
@@ -221,6 +502,6 @@ export function startAnalysis(id: string): void {
   if (!record) throw new ApiError(404, "presentation_not_found", `Presentation '${id}' was not found.`);
   if (record.status === "analyzing") throw new ApiError(409, "analysis_in_progress", "Analysis is already in progress.");
   if (record.status === "complete") throw new ApiError(409, "analysis_already_complete", "Analysis has already completed.");
-  presentationRepository.update(id, { status: "analyzing", stage: "queued", progress: 5, error: null });
+  presentationRepository.update(id, { status: "analyzing", stage: "queued", progress: 5, phase: null, currentSectionId: null, currentPersonaId: null, message: "분석을 준비하고 있어요.", error: null });
   void runAnalysis(id);
 }
