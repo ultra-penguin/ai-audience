@@ -232,7 +232,10 @@ const sectionModelResponseSchema = z.object({
     blockers: z.array(z.string().min(1)).max(6),
     questions: z.array(z.string().min(1)).max(6),
     needsExample: z.boolean(),
-    improvement: z.object({ title: z.string().min(1), problem: z.string().min(1), action: z.string().min(1), example: z.string().min(1) }).nullable(),
+    improvement: z.preprocess(
+      (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : null),
+      z.object({ title: z.string().min(1), problem: z.string().min(1), action: z.string().min(1), example: z.string().min(1) }).nullable(),
+    ),
   })).min(1).max(12),
 }).strict();
 type SectionModelResponse = z.infer<typeof sectionModelResponseSchema>;

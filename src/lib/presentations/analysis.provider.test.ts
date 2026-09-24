@@ -105,7 +105,6 @@ describe("real analysis provider", () => {
               blockers: [],
               questions: [],
               needsExample: false,
-              improvement: null,
             },
             {
               sectionId: "concept",
