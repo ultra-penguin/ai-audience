@@ -165,7 +165,11 @@
   --animate-draw: draw 700ms var(--ease-out) both;
   --animate-settle: settle 420ms var(--ease-out) both;
   /* Hero voice: a few beats while the sequence plays, then rests at its natural shape. */
-  --animate-speak: speak 900ms ease-in-out 3;
+  --animate-speak: speak 650ms ease-in-out 3;
+  /* Scroll entrances: played once from `data-reveal="play"`; `both` holds the start frame during a delay. */
+  --animate-reveal: reveal 520ms var(--ease-out) both;
+  --animate-wipe: wipe 700ms var(--ease-out) both;
+  --animate-grow-x: grow-x 1000ms var(--ease-out) both;
 
   @keyframes listen {
     0%,
@@ -204,6 +208,26 @@
     }
     50% {
       transform: scaleY(0.4);
+    }
+  }
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+  /* A cover sliding off to uncover lines underneath — transform only. */
+  @keyframes wipe {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes grow-x {
+    from {
+      transform: scaleX(0);
     }
   }
   @keyframes rise-in {

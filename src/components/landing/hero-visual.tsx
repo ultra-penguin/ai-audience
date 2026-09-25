@@ -16,7 +16,8 @@ const SAID = DEMO.transcript?.segments.find((s) => s.id === focusSegmentId)?.tex
  * ③ each one reacts differently. Pure CSS on load (no JS needed); every step uses
  * `both` fill so the final frame is what stays, and reduced motion skips straight to it.
  */
-const STEP_MS = { voice: 0, said: 250, branch: 1100, persona: 1450, reaction: 2150 } as const;
+/** Whole sequence settles by ~2.4s: last quote starts at 1700 + 2×160 + 100 ms and runs 220 ms. */
+const STEP_MS = { voice: 0, said: 200, branch: 800, persona: 1050, reaction: 1700 } as const;
 const at = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 const once = "motion-reduce:animate-none";
 
@@ -46,7 +47,7 @@ export function HeroVisual() {
               <span
                 key={i}
                 className={cn("animate-speak w-1 origin-center rounded-full bg-on-surface", once)}
-                style={{ height: `${h * 100}%`, ...at(i * 60) }}
+                style={{ height: `${h * 100}%`, ...at(i * 30) }}
               />
             ))}
           </span>
@@ -69,7 +70,7 @@ export function HeroVisual() {
             vectorEffect="non-scaling-stroke"
             strokeDasharray="1"
             className={cn("animate-draw", once)}
-            style={at(STEP_MS.branch + i * 80)}
+            style={at(STEP_MS.branch + i * 60)}
           />
         ))}
       </svg>
@@ -87,22 +88,22 @@ export function HeroVisual() {
             <li key={listener.personaId} className="flex flex-col items-center gap-2 text-center">
               <span
                 className={cn("animate-settle flex size-11 items-center justify-center rounded-full sm:size-14", PERSONA_STYLE[listener.kind].chip, once)}
-                style={at(STEP_MS.persona + i * 140)}
+                style={at(STEP_MS.persona + i * 120)}
               >
                 <Icon aria-hidden className="size-5 sm:size-6" />
               </span>
-              <span className={cn("animate-rise-in text-label-lg text-on-surface", once)} style={at(STEP_MS.persona + i * 140 + 80)}>
+              <span className={cn("animate-rise-in text-label-lg text-on-surface", once)} style={at(STEP_MS.persona + i * 120 + 80)}>
                 {listener.name}
               </span>
               <span
                 className={cn("animate-rise-in inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label-md", reception.chip, once)}
-                style={at(STEP_MS.reaction + i * 220)}
+                style={at(STEP_MS.reaction + i * 160)}
               >
                 <ReceptionIcon aria-hidden className="size-3.5" />
                 {reception.label}
               </span>
               {listener.evidence && (
-                <span className={cn("animate-rise-in hidden text-body-sm text-on-surface-variant text-pretty sm:block", once)} style={at(STEP_MS.reaction + 120 + i * 220)}>
+                <span className={cn("animate-rise-in hidden text-body-sm text-on-surface-variant text-pretty sm:block", once)} style={at(STEP_MS.reaction + 100 + i * 160)}>
                   “{listener.evidence}”
                 </span>
               )}

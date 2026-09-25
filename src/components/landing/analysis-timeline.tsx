@@ -6,7 +6,7 @@ import { cn, formatDuration } from "@/lib/utils";
 import { DEMO, DEMO_MOMENTS, PERSONA_ICON, RECEPTION_META } from "./landing-data";
 import { defaultMomentIndex, momentSummary } from "./motion-demo";
 import { SectionIntro } from "./section-intro";
-import { useInView } from "./use-in-view";
+import { useScrollReveal } from "./use-in-view";
 
 const END_SEC = Math.max(DEMO.durationSec, ...DEMO_MOMENTS.map((m) => m.endSec));
 const pct = (sec: number) => (sec / END_SEC) * 100;
@@ -14,21 +14,21 @@ const pct = (sec: number) => (sec / END_SEC) * 100;
 /** Section 07: the talk's timeline; selecting a point shows each listener's reaction there. */
 export function AnalysisTimeline() {
   const [selected, setSelected] = useState(() => defaultMomentIndex(DEMO_MOMENTS));
-  const { ref, inView } = useInView<HTMLDivElement>(0.4);
+  const ref = useScrollReveal<HTMLDivElement>();
   const moment = DEMO_MOMENTS[selected];
 
   return (
-    <section aria-labelledby="timeline-title" className="space-y-10 border-t border-outline-variant/60 py-16 md:py-24">
+    <section aria-labelledby="timeline-title" className="space-y-8 border-t border-outline-variant/60 py-14 md:py-20">
       <SectionIntro id="timeline-title" eyebrow="분석 타임라인" title="반응은 발표의 특정 순간에 연결됩니다.">
         발표 시간 위의 한 지점을 고르면, 그 순간 세 관중이 각각 어떻게 들었는지 볼 수 있어요.
       </SectionIntro>
 
-      <div ref={ref} data-inview={inView || undefined} className="group/tl space-y-6">
+      <div ref={ref} className="group/tl space-y-5">
         {/* The axis draws once, left to right; the marker glides to the selected moment. Decorative — the buttons below carry the meaning. */}
         <div aria-hidden className="relative px-6 pt-7">
           <div className="relative h-2">
             <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-outline-variant" />
-            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 origin-left bg-on-surface motion-js:scale-x-0 motion-js:transition-transform motion-js:duration-1000 motion-js:ease-out motion-js:group-data-inview/tl:scale-x-100" />
+            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 origin-left bg-on-surface motion-js:group-data-[reveal=play]/tl:animate-grow-x" />
             {DEMO_MOMENTS.map((m, i) => (
               <span
                 key={m.id}
@@ -81,9 +81,9 @@ export function AnalysisTimeline() {
           })}
         </div>
 
-        <div data-testid="timeline-detail" aria-live="polite" className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/70 sm:p-8">
+        <div data-testid="timeline-detail" aria-live="polite" className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/70 sm:p-6">
           {moment && (
-            <div key={moment.id} className="animate-rise-in space-y-6 motion-reduce:animate-none">
+            <div key={moment.id} className="animate-rise-in space-y-5 motion-reduce:animate-none">
               <div className="space-y-2">
                 <p className="text-label-md tabular-nums text-on-surface-variant">
                   <span className="mr-1.5 rounded-sm bg-surface-container px-1.5 py-0.5 text-label-sm text-on-surface">DEMO · 예시</span>
