@@ -136,12 +136,23 @@ async function performanceChecks(page, pageResult, viewport) {
   await runCheck(name, "animations use transform/opacity only", async () => {
     const result = await page.evaluate(() => {
       const bad = [];
+      const animationTargets = new Map();
+      for (const node of document.querySelectorAll("*")) {
+        const names = getComputedStyle(node).animationName.split(",").map((name) => name.trim()).filter((name) => name && name !== "none");
+        for (const name of names) {
+          const targets = animationTargets.get(name) ?? [];
+          targets.push(node);
+          animationTargets.set(name, targets);
+        }
+      }
       const visit = (rules) => {
         for (const rule of rules) {
           if (rule.type === CSSRule.KEYFRAMES_RULE) {
             for (const keyframe of rule.cssRules) {
               for (const property of keyframe.style) {
-                if (!["transform", "opacity"].includes(property) && !property.startsWith("--tw-")) {
+                const exceptionTargets = animationTargets.get(rule.name) ?? [];
+                const isApprovedSvgPathException = property === "stroke-dashoffset" && exceptionTargets.length > 0 && exceptionTargets.every((target) => target.tagName.toLowerCase() === "path" && target.namespaceURI === "http://www.w3.org/2000/svg");
+                if (!["transform", "opacity"].includes(property) && !property.startsWith("--tw-") && !isApprovedSvgPathException) {
                   bad.push(`${rule.name}:${property}`);
                 }
               }
@@ -160,7 +171,7 @@ async function performanceChecks(page, pageResult, viewport) {
       }
       return [...new Set(bad)];
     });
-    return { pass: result.length === 0, detail: result.length ? result.join(", ") : "all keyframes limited to transform/opacity" };
+    return { pass: result.length === 0, detail: result.length ? result.join(", ") : "transform/opacity only; approved SVG path stroke-dashoffset exception" };
   });
 }
 

@@ -81,7 +81,7 @@ export function PersonaSimulation() {
 
         {/* One source → three listeners, drawn at the same instant (a transform-only wipe uncovers the lines). */}
         <div aria-hidden className="relative hidden overflow-hidden lg:block">
-          <svg viewBox="0 0 80 300" preserveAspectRatio="none" className="absolute inset-0 size-full text-outline">
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 80 300" preserveAspectRatio="none" className="absolute inset-0 size-full text-outline">
             {[50, 150, 250].map((y) => (
               <path key={y} d={`M0 150 C40 150 40 ${y} 80 ${y}`} fill="none" stroke="currentColor" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
             ))}

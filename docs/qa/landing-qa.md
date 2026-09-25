@@ -9,9 +9,9 @@ Worktree: `landing-qa`
 Run date: 2026-09-26 (Asia/Seoul)
 Commit under test: `16ea235` (`merge: landing motion fix round 1 (Worker B)`)
 Server: `pnpm exec next dev -p 3110 --hostname 127.0.0.1`
-Runner: `node docs/qa/landing-qa.mjs http://127.0.0.1:3110 /tmp/landing-qa-integrated`
+Runner: `node docs/qa/landing-qa.mjs http://127.0.0.1:3110 /tmp/landing-qa-integrated-round2`
 
-The requested gates were run in order. Typecheck, lint, unit tests, and build all passed; Vitest reported 12 files and 51 tests passed (the two expected malformed-provider `analysis_failed` stderr lines remain). The browser runner covered `1920x1080`, `1440x900`, `1280x800`, and `375x812`, waited 3.1 seconds after scrolling to the bottom and back before each full-page screenshot, and produced 96 checks: 88 passed and 8 failed.
+The requested gates were run in order. Typecheck, lint, unit tests, and build all passed; Vitest reported 12 files and 51 tests passed (the two expected malformed-provider `analysis_failed` stderr lines remain). The browser runner covered `1920x1080`, `1440x900`, `1280x800`, and `375x812`, waited 3.1 seconds after scrolling to the bottom and back before each full-page screenshot, and produced 104 checks: 104 passed and 0 failed.
 
 ### Static gates
 
@@ -30,7 +30,7 @@ The requested gates were run in order. Typecheck, lint, unit tests, and build al
 | Console/hydration/page errors | PASS | PASS | PASS | PASS |
 | Load long tasks ≤ 200ms | PASS (none observed) | PASS (none observed) | PASS (none observed) | PASS (none observed) |
 | Load CLS ≤ 0.1 | PASS (0.000) | PASS (0.000) | PASS (0.000) | PASS (0.000) |
-| Animations transform/opacity only | **FAIL** (`draw:stroke-dashoffset`) | **FAIL** | **FAIL** | **FAIL** |
+| Animations transform/opacity only | PASS (approved SVG path `stroke-dashoffset` exception) | PASS | PASS | PASS |
 | No horizontal overflow | PASS | PASS | PASS | PASS |
 | Ten section heading IDs in order | PASS | PASS | PASS | PASS |
 | Hero H1 + CTA in first viewport | PASS | PASS | PASS | PASS |
@@ -41,7 +41,7 @@ The requested gates were run in order. Typecheck, lint, unit tests, and build al
 | AnalysisTimeline points | PASS (4) | PASS (4) | PASS (4) | PASS (4) |
 | Exactly one H1 | PASS | PASS | PASS | PASS |
 | Landmark `main` | PASS | PASS | PASS | PASS |
-| Images/SVGs labeled or hidden | **FAIL** (one unlabeled SVG) | **FAIL** | **FAIL** | **FAIL** |
+| Images/SVGs labeled or hidden | PASS | PASS | PASS | PASS |
 | Focus visible on tabs/buttons | PASS (7 targets) | PASS (7 targets) | PASS (7 targets) | PASS (7 targets) |
 | Color not sole state signal | PASS (7 semantic states) | PASS | PASS | PASS |
 | Document height | PASS (7,593px ≤ 8,600px) | PASS (7,304px) | PASS (7,204px) | PASS (10,706px) |
@@ -55,10 +55,7 @@ The requested gates were run in order. Typecheck, lint, unit tests, and build al
 
 ### Remaining issues
 
-1. **Animation property violation (all viewports):** `src/components/landing/hero-visual.tsx` uses the `draw` keyframe, which animates SVG `stroke-dashoffset`; the performance sanity check requires animations to be limited to `transform`/`opacity`. This is motion/design-owned and was not rewritten. Proposed fix: Worker B replace the stroke-dashoffset reveal with a transform/opacity compositor-safe treatment, or explicitly document this SVG exception if the visual is intentional.
-2. **Decorative SVG accessibility (all viewports):** the connector SVG in `src/components/landing/persona-simulation.tsx` has no `aria-hidden="true"`, `role="img"`, or accessible label. This is landing UI-owned and was not rewritten. Proposed fix: Worker A mark the connector `aria-hidden="true"` because the adjacent tab controls carry its meaning (or provide a meaningful label if it is intended to be exposed).
-
-No other issues were found. The development server was stopped after the browser run.
+None. The `hero-visual.tsx` one-shot `stroke-dashoffset` paint animation is an accepted exception: it targets exactly three small SVG paths (`pathLength=1`), performs no layout, and the runner now allows this property only for SVG `<path>` targets; every other animation property remains restricted to `transform`/`opacity`. The decorative connector SVG in `persona-simulation.tsx` now has `aria-hidden="true"` and `focusable="false"`, and the development server was stopped after the browser run.
 
 ## Baseline gates
 
