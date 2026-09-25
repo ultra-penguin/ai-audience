@@ -7,7 +7,7 @@ import { cn, formatDurationLong } from "@/lib/utils";
 import { DEMO, PERSONA_ICON, RECEPTION_META } from "./landing-data";
 import { UNDERSTANDING_RECEPTION } from "./motion-demo";
 import { SectionIntro } from "./section-intro";
-import { useInView } from "./use-in-view";
+import { useScrollReveal } from "./use-in-view";
 
 const WAVE = [0.4, 0.7, 0.5, 0.9, 0.6, 1, 0.45, 0.8, 0.55, 0.35];
 
@@ -21,7 +21,7 @@ export function PersonaSimulation() {
   const baseId = useId();
   const [selected, setSelected] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const { ref, inView } = useInView<HTMLDivElement>(0.35);
+  const ref = useScrollReveal<HTMLDivElement>();
 
   const select = (i: number) => {
     const next = (i + LISTENERS.length) % LISTENERS.length;
@@ -29,12 +29,15 @@ export function PersonaSimulation() {
     tabRefs.current[next]?.focus();
   };
 
+  // WAI-ARIA APG: arrows move from the tab that has focus, which may differ from the selected one.
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const focused = tabRefs.current.findIndex((t) => t === e.target);
+    if (focused < 0) return;
     const moves: Record<string, number> = {
-      ArrowRight: selected + 1,
-      ArrowDown: selected + 1,
-      ArrowLeft: selected - 1,
-      ArrowUp: selected - 1,
+      ArrowRight: focused + 1,
+      ArrowDown: focused + 1,
+      ArrowLeft: focused - 1,
+      ArrowUp: focused - 1,
       Home: 0,
       End: LISTENERS.length - 1,
     };
@@ -48,14 +51,13 @@ export function PersonaSimulation() {
   const panelId = `${baseId}-panel`;
 
   return (
-    <section aria-labelledby="simulation-title" className="space-y-10 border-t border-outline-variant/60 py-16 md:py-24">
+    <section aria-labelledby="simulation-title" className="space-y-8 border-t border-outline-variant/60 py-14 md:py-20">
       <SectionIntro id="simulation-title" eyebrow="시뮬레이션" title="하나의 발표가, 세 관중에게 동시에 닿습니다.">
         같은 말을 들어도 받아들이는 것은 다릅니다. 관중을 골라 그 관중의 반응을 들어보세요.
       </SectionIntro>
 
       <div
         ref={ref}
-        data-inview={inView || undefined}
         className="group/sim grid gap-4 lg:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] lg:gap-0"
       >
         {/* The presentation — a single source. */}
@@ -84,7 +86,7 @@ export function PersonaSimulation() {
               <path key={y} d={`M0 150 C40 150 40 ${y} 80 ${y}`} fill="none" stroke="currentColor" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
             ))}
           </svg>
-          <span className="absolute inset-0 hidden bg-background motion-js:block motion-js:transition-transform motion-js:duration-700 motion-js:ease-out motion-js:group-data-inview/sim:translate-x-full" />
+          <span className="absolute inset-0 hidden bg-background motion-js:group-data-[reveal=play]/sim:block motion-js:group-data-[reveal=play]/sim:animate-wipe motion-js:group-data-[reveal=play]/sim:[animation-delay:150ms]" />
         </div>
         <p aria-hidden className="text-center text-label-md text-on-surface-variant lg:hidden">
           ↓ 같은 발표를 동시에 들어요
@@ -115,7 +117,7 @@ export function PersonaSimulation() {
                 tabIndex={isSelected ? 0 : -1}
                 onClick={() => setSelected(i)}
                 className={cn(
-                  "flex min-h-11 flex-col items-center gap-2 rounded-xl p-3 text-center transition-colors lg:flex-row lg:gap-3 lg:p-4 lg:text-left",
+                  "flex min-h-11 flex-col items-center gap-2 rounded-xl p-3 text-center transition-colors lg:flex-row lg:gap-3 lg:px-4 lg:py-3 lg:text-left",
                   isSelected ? "bg-surface-container-lowest ring-2 ring-on-surface" : "ring-1 ring-outline-variant/70 hover:bg-surface-container-lowest/70",
                 )}
               >
@@ -128,8 +130,7 @@ export function PersonaSimulation() {
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label-md",
                     meta.chip,
-                    "motion-js:transition-[opacity,translate] motion-js:delay-500 motion-js:duration-500 motion-js:ease-out",
-                    "motion-js:group-not-data-inview/sim:translate-y-1 motion-js:group-not-data-inview/sim:opacity-0",
+                    "motion-js:group-data-[reveal=play]/sim:animate-rise-in motion-js:group-data-[reveal=play]/sim:[animation-delay:650ms]",
                   )}
                 >
                   <StateIcon aria-hidden className="size-3.5" />
@@ -147,7 +148,7 @@ export function PersonaSimulation() {
           role="tabpanel"
           aria-labelledby={tabId(selected)}
           tabIndex={0}
-          className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/70 sm:p-8"
+          className="rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/70 sm:p-6"
         >
           <div key={current.persona.id} className="animate-rise-in grid gap-6 motion-reduce:animate-none md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:gap-10">
             <div className="space-y-4">
