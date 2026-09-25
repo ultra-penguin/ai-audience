@@ -7,7 +7,7 @@ import { resolveSelected, sectionsByTime } from "@/features/result/report";
 import { Card } from "@/components/ui/card";
 import { PERSONA_STYLE } from "@/lib/persona-style";
 import { cn, formatDuration } from "@/lib/utils";
-import { CATEGORY_LABEL, FeedbackChain, Highlighted } from "./feedback-chain";
+import { issueLabel, FeedbackChain, Highlighted } from "./feedback-chain";
 import { ReportHeading, SectionLink } from "./report-parts";
 
 const SEVERITY_LABEL: Record<NonNullable<DifficultSection["severity"]>, string> = {
@@ -45,7 +45,7 @@ function Timeline({
                   sectionId={s.id}
                   className="group absolute top-0 flex h-8 min-w-6 items-center"
                   style={{ left: `${Math.min(left, 100 - width)}%`, width: `${width}%` }}
-                  aria-label={`${formatDuration(s.startSec)} ${s.category ? CATEGORY_LABEL[s.category] : "설명이 더 필요한 구간"}${s.reactions.length > 0 ? `, 관중 ${s.reactions.length}명` : ", 개별 관중 반응 미구분"}`}
+                  aria-label={`${formatDuration(s.startSec)} ${issueLabel(s)}${s.reactions.length > 0 ? `, 관중 ${s.reactions.length}명` : ", 개별 관중 반응 미구분"}`}
                   aria-current={selected ? "true" : undefined}
                 >
                   <span
@@ -109,7 +109,7 @@ function SectionDetail({ section, result }: { section: DifficultSection; result:
         <span className="rounded bg-surface-container px-1.5 py-0.5 text-label-md tabular-nums text-on-surface-variant">
           {formatDuration(section.startSec)}
         </span>
-        <span className="text-label-lg text-on-surface">{section.category ? CATEGORY_LABEL[section.category] : "설명이 더 필요한 구간"}</span>
+        <span className="text-label-lg text-on-surface">{issueLabel(section)}</span>
         {section.severity && <span className="text-body-sm text-on-surface-variant">· {SEVERITY_LABEL[section.severity]}</span>}
       </div>
       <FeedbackChain section={section} personas={result.personas} />
@@ -221,7 +221,7 @@ export function DifficultSections({ result, number }: { result: AnalysisResult; 
                           <span className="rounded bg-surface-container px-1.5 py-0.5 text-label-md tabular-nums text-on-surface-variant">
                             {formatDuration(s.startSec)}
                           </span>
-                          <span className="text-label-md text-on-surface">{s.category ? CATEGORY_LABEL[s.category] : "설명이 더 필요한 구간"}</span>
+                          <span className="text-label-md text-on-surface">{issueLabel(s)}</span>
                           {s.reactions.length > 0 && <span className="text-label-md text-on-surface-variant">· 관중 {s.reactions.length}명</span>}
                           {s.id === priorityId && (
                             <span className="ml-auto rounded bg-primary-fixed px-2 py-0.5 text-label-sm text-on-primary-fixed">먼저 고칠 곳</span>

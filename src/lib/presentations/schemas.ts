@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CONFUSION_TYPES, LIKELIHOODS, REACTION_TYPES, SALIENCE_LEVELS } from "./audience-simulation";
 
 export const presentationStatusSchema = z.enum(["uploaded", "analyzing", "complete", "failed"]);
 export type PresentationStatus = z.infer<typeof presentationStatusSchema>;
@@ -36,8 +37,10 @@ export const transcriptSegmentSchema = z.object({
 });
 export type TranscriptSegment = z.infer<typeof transcriptSegmentSchema>;
 
+const personaIdSchema = z.enum(["beginner", "peer", "specialist"]);
+
 export const personaFeedbackSchema = z.object({
-  id: z.enum(["beginner", "peer", "specialist"]),
+  id: personaIdSchema,
   name: z.string().min(1),
   perspective: z.string().min(1),
   comprehensionScore: z.number().int().min(0).max(100),
@@ -81,6 +84,19 @@ export const sectionAudienceAnalysisSchema = z.object({
   questions: z.array(z.string().min(1)).max(6),
   needsExample: z.boolean(),
   improvement: improvementSchema.omit({ id: true, sourceSegmentIds: true }).nullable(),
+  /** Cognitive-simulation detail behind this row (absent for older results). */
+  simulation: z.object({
+    stateBefore: z.string().min(1),
+    newInformation: z.string().min(1),
+    stateAfter: z.string().min(1),
+    reactionType: z.enum(REACTION_TYPES),
+    agreement: z.enum(["agree", "neutral", "disagree", "unclear"]),
+    cause: z.enum(CONFUSION_TYPES).nullable(),
+    likelihood: z.enum(LIKELIHOODS),
+    salience: z.enum(SALIENCE_LEVELS),
+    mentalModelGap: z.object({ missingModel: z.string().min(1), approach: z.string().min(1) }).nullable(),
+    recovery: z.string().min(1).nullable(),
+  }).optional(),
 });
 export type SectionAudienceAnalysis = z.infer<typeof sectionAudienceAnalysisSchema>;
 
@@ -115,12 +131,50 @@ export const analysisResultSchema = z.object({
   difficultSections: z.array(z.object({
     segmentId: z.string().min(1),
     reason: z.string().min(1),
+    /** Simulation issues only: the map section, who it affected and why listeners differed. */
+    sectionId: z.string().min(1).optional(),
+    personaIds: z.array(personaIdSchema).optional(),
+    cause: z.enum(CONFUSION_TYPES).nullable().optional(),
+    likelihood: z.enum(LIKELIHOODS).optional(),
+    salience: z.enum(SALIENCE_LEVELS).optional(),
+    pattern: z.string().min(1).optional(),
+    evidence: z.string().min(1).optional(),
   })),
   missingExplanations: z.array(z.string().min(1)),
   improvements: z.array(improvementSchema),
   structure: z.object({ sections: z.array(structureSectionSchema).min(1).max(12) }).optional(),
   sectionAnalyses: z.array(sectionAudienceAnalysisSchema).optional(),
   discovery: analysisDiscoverySchema.optional(),
+  keyMoments: z.array(z.object({
+    kind: z.enum(["first_drop", "interest_peak", "common_question"]),
+    sectionId: z.string().min(1),
+    startSeconds: z.number().nonnegative(),
+    title: z.string().min(1),
+    detail: z.string().min(1),
+    personaIds: z.array(personaIdSchema),
+  })).optional(),
+  naturalQuestions: z.array(z.object({
+    question: z.string().min(1),
+    sectionId: z.string().min(1),
+    personaIds: z.array(personaIdSchema).min(1),
+  })).optional(),
+  /** Structured missing explanations from salient TERM/CONCEPT/CONTEXT/PURPOSE/REFERENCE gaps. */
+  explanationGaps: z.array(z.object({
+    term: z.string().min(1),
+    why: z.string().min(1),
+    suggestion: z.string().min(1),
+    sectionId: z.string().min(1),
+    segmentId: z.string().min(1),
+    personaIds: z.array(personaIdSchema),
+  })).optional(),
+  /** Analogy suggestions that passed the four-condition analogy check. */
+  mentalModelGaps: z.array(z.object({
+    missingModel: z.string().min(1),
+    approach: z.string().min(1),
+    sectionId: z.string().min(1),
+    segmentId: z.string().min(1),
+    personaIds: z.array(personaIdSchema),
+  })).optional(),
 });
 export type AnalysisResult = z.infer<typeof analysisResultSchema>;
 

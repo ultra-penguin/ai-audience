@@ -88,6 +88,9 @@ export const SAMPLE_RESULT: AnalysisResult = {
       ],
       reason:
         "전문 지표를 정의 없이 사용했고, ‘12.4% 개선’이 무엇의 12.4%인지(오차율인지, 판매량인지) 기준점이 빠져 있어요.",
+      cause: "TERM_CONFUSION",
+      likelihood: "high",
+      pattern: "전문가는 MAPE를 이미 알고 있어 바로 해석했지만, 비전공·일반 관중은 비교 기준이 없어 숫자를 자기 가게의 변화로 옮기지 못했을 가능성이 높아요.",
       improvement: {
         suggestion: "지표 이름 대신 ‘예측이 평균적으로 얼마나 빗나가는지’로 먼저 설명하고, 실제 개수나 금액으로 바꿔 말해 보세요.",
         rewrite:
@@ -108,6 +111,9 @@ export const SAMPLE_RESULT: AnalysisResult = {
         { personaId: "p-beginner", reaction: "‘이동평균’에서 멈췄고, 그 뒤는 거의 흘려들었어요." },
       ],
       reason: "9개 항목을 묶음 없이 한 문장에 나열해서, 듣는 사람이 기억하거나 우선순위를 파악하기 어려워요.",
+      cause: "CONNECTION_CONFUSION",
+      likelihood: "likely",
+      pattern: "항목 하나하나는 익숙한 말이지만 무엇이 중요한지 묶어 주지 않아, 배경지식과 관계없이 세 관중 모두 우선순위를 스스로 만들어야 했을 가능성이 있어요.",
       improvement: {
         suggestion: "변수를 2~3개의 묶음으로 나누고, 가장 영향이 컸던 하나를 예시와 함께 강조하세요.",
         rewrite:
@@ -127,6 +133,9 @@ export const SAMPLE_RESULT: AnalysisResult = {
         { personaId: "p-expert", reaction: "어떤 기간으로, 어떤 방식으로 검증했는지 없이 결론만 들렸어요." },
       ],
       reason: "비교의 기준(검증 기간, 평가 방식, 단순 기준선)이 빠져 있어서 결과를 신뢰할 근거가 부족해요.",
+      cause: "LOGIC_GAP",
+      likelihood: "likely",
+      pattern: "비전공 관중은 모델 이름에서 이미 멈췄고, 전문가 관중은 이름은 알지만 검증 방식이 빠져 결론을 믿을 근거를 찾지 못했을 가능성이 높아요. 원인은 달라도 같은 구간에서 멈췄어요.",
       improvement: {
         suggestion: "검증 방식을 한 문장으로 덧붙이고, ‘지난주 판매량 그대로’ 같은 단순 기준선과도 비교했음을 알려주세요.",
         rewrite:
@@ -146,6 +155,9 @@ export const SAMPLE_RESULT: AnalysisResult = {
         { personaId: "p-peer", reaction: "가장 궁금했던 금액이 ‘참고로’ 뒤에 묻혀서 지나갔어요." },
       ],
       reason: "결정에 가장 중요한 숫자(월 절감액)가 결론의 부연처럼 전달돼 핵심 메시지로 인식되지 않아요.",
+      cause: "PURPOSE_CONFUSION",
+      likelihood: "possible",
+      pattern: "비용 절감을 기대하던 일반 관중에게는 가장 중요한 숫자였지만 ‘참고로’ 뒤에 나와서 부연으로 흘려들었을 가능성이 있어요.",
       improvement: {
         suggestion: "절감 금액을 발표 도입부와 결론 첫 문장에 두 번 배치하고, 요청하는 결정을 분명히 말하세요.",
         rewrite:
@@ -274,6 +286,42 @@ export const SAMPLE_RESULT: AnalysisResult = {
     difficultSectionId: "sec-metric",
     personaIds: ["p-expert", "p-beginner"],
   },
+  keyMoments: [
+    {
+      id: "moment-1",
+      kind: "interest_peak",
+      startSec: 22,
+      title: "관심이 가장 크게 올라간 구간",
+      detail: "버려진 우유와 크루아상 사진에서 세 관중 모두 문제를 자기 일처럼 느꼈을 가능성이 높아요.",
+      sectionId: "map-problem",
+      personaIds: ["p-beginner", "p-peer", "p-expert"],
+    },
+    {
+      id: "moment-2",
+      kind: "first_drop",
+      startSec: 48,
+      title: "이해가 처음으로 떨어진 구간",
+      detail: "‘MAPE 12.4%’가 정의 없이 나오면서 비전공 관중의 이해가 처음 흔들렸을 가능성이 높아요.",
+      sectionId: "map-result",
+      difficultSectionId: "sec-metric",
+      personaIds: ["p-beginner", "p-peer"],
+    },
+    {
+      id: "moment-3",
+      kind: "common_question",
+      startSec: 210,
+      title: "여러 관중이 공통으로 질문을 가진 구간",
+      detail: "모델 비교 결과만 나오자 일반·전문가 관중이 ‘무엇을 기준으로 더 잘 나왔는지’ 궁금해했을 가능성이 있어요.",
+      sectionId: "map-method",
+      difficultSectionId: "sec-model",
+      personaIds: ["p-peer", "p-expert"],
+    },
+  ],
+  naturalQuestions: [
+    { id: "question-1", question: "12.4% 개선이면 하루에 몇 개를 덜 버리게 되나요?", personaIds: ["p-beginner", "p-peer"], sectionId: "map-result", startSec: 48 },
+    { id: "question-2", question: "LightGBM이 더 잘 나왔다는 건 어떤 기간, 어떤 기준으로 비교한 건가요?", personaIds: ["p-peer", "p-expert"], sectionId: "map-method", startSec: 96 },
+    { id: "question-3", question: "시범 운영 2주 동안 무엇을 보고 성공이라고 판단하나요?", personaIds: ["p-expert"], sectionId: "map-close", startSec: 246 },
+  ],
 };
 
 /** A result where the audience followed everything — exercises the empty state. */
@@ -302,6 +350,7 @@ export const SAMPLE_RESULT_NO_ISSUES: AnalysisResult = {
     cells: SAMPLE_RESULT.audienceHeatmap!.cells.map((c) => ({ ...c, reception: "clear" as const, evidence: undefined })),
   },
   discovery: undefined,
+  keyMoments: [SAMPLE_RESULT.keyMoments![0]!],
 };
 
 /** Phase 3 shape: no presentation map, heatmap or discovery. Legacy results must still read well. */
@@ -311,4 +360,7 @@ export const SAMPLE_RESULT_LEGACY: AnalysisResult = {
   presentationMap: undefined,
   audienceHeatmap: undefined,
   discovery: undefined,
+  keyMoments: undefined,
+  naturalQuestions: undefined,
+  difficultSections: SAMPLE_RESULT.difficultSections.map((section) => ({ ...section, cause: undefined, likelihood: undefined, pattern: undefined })),
 };

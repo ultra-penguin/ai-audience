@@ -162,6 +162,8 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --animate-listen: listen 1.6s ease-in-out infinite;
   --animate-rise-in: rise-in 220ms var(--ease-out) both;
+  --animate-draw: draw 700ms var(--ease-out) both;
+  --animate-settle: settle 420ms var(--ease-out) both;
 
   @keyframes listen {
     0%,
@@ -170,6 +172,26 @@
     }
     50% {
       transform: scaleY(1);
+    }
+  }
+  /* SVG paths drawn with pathLength="1" so one keyframe fits every length. */
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  /* A persona "arriving": scale from slightly small, never from zero. */
+  @keyframes settle {
+    from {
+      opacity: 0;
+      transform: scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
   @keyframes rise-in {
@@ -213,6 +235,7 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

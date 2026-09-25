@@ -59,7 +59,7 @@ export function StructureProgress({ status }: { status: AnalysisStatus }) {
           <caption className="sr-only">구간별 관중 진행 상황</caption>
           <thead>
             <tr className="border-b border-outline-variant/50">
-              <th scope="col" className="px-4 py-2.5 text-label-md text-on-surface-variant">
+              <th scope="col" className="px-3 py-2 text-label-md text-on-surface-variant">
                 구간
               </th>
               {personas.map((p) => (
@@ -88,7 +88,7 @@ export function StructureProgress({ status }: { status: AnalysisStatus }) {
                   aria-current={current ? "location" : undefined}
                   className={cn("border-b border-outline-variant/30 transition-colors duration-300 last:border-0", current && "bg-surface-container-low")}
                 >
-                  <th scope="row" className="px-4 py-3 font-normal">
+                  <th scope="row" className="px-3 py-2 font-normal">
                     <span className="flex flex-wrap items-baseline gap-x-2">
                       <span aria-hidden className="text-label-md tabular-nums text-on-surface-variant">
                         {i + 1}
@@ -101,7 +101,7 @@ export function StructureProgress({ status }: { status: AnalysisStatus }) {
                     </span>
                   </th>
                   {personas.map((p) => (
-                    <td key={p.id} className="px-1 py-3 text-center">
+                    <td key={p.id} className="px-1 py-2 text-center">
                       <CellMark state={cellStateFor(pipeline, s.id, p.id)} dot={PERSONA_STYLE[p.kind].dot} />
                     </td>
                   ))}
@@ -138,7 +138,7 @@ export function InsightCards({ pipeline }: { pipeline: AnalysisPipeline }) {
           const persona = ins.personaId ? personas.get(ins.personaId) : undefined;
           const section = ins.sectionId ? sections.get(ins.sectionId) : undefined;
           return (
-            <li key={ins.id} className="animate-rise-in space-y-2 border-t border-outline-variant/60 py-5 motion-reduce:animate-none">
+            <li key={ins.id} className="animate-rise-in space-y-1.5 border-t border-outline-variant/60 py-3 motion-reduce:animate-none">
               {(persona || section) && (
                 <p className="flex flex-wrap items-center gap-2">
                   {persona && <PersonaChip persona={persona} />}

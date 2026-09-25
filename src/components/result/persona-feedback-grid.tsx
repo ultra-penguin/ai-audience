@@ -16,7 +16,7 @@ export function PersonaFeedbackGrid({ result, number }: { result: AnalysisResult
   const setPersonaFilter = useResultUiStore((s) => s.setPersonaFilter);
 
   return (
-    <section aria-labelledby="personas-title" className="space-y-6">
+    <section id="personas" aria-labelledby="personas-title" className="scroll-mt-24 space-y-4">
       <ReportHeading id="personas-title" number={number} title="관중의 목소리">
         같은 발표를 들은 관중이 각자 무엇을 가져가고, 어디서 놓쳤는지 들은 그대로예요.
       </ReportHeading>
@@ -28,7 +28,7 @@ export function PersonaFeedbackGrid({ result, number }: { result: AnalysisResult
           const u = UNDERSTANDING[f.understanding];
           const stuckCount = sectionsHeardBy(result.difficultSections, persona.id).length;
           return (
-            <li key={f.personaId} className="grid gap-4 py-6 first:pt-0 md:grid-cols-[13rem_1fr] md:gap-8">
+            <li key={f.personaId} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[12rem_1fr] md:gap-6">
               <div className="space-y-2">
                 <PersonaChip persona={persona} />
                 <p className="text-body-sm text-on-surface-variant">{persona.description}</p>
@@ -39,7 +39,7 @@ export function PersonaFeedbackGrid({ result, number }: { result: AnalysisResult
               </div>
 
               <div className="min-w-0 space-y-4">
-                <blockquote className={cn("border-l-[3px] pl-4 text-body-xl text-on-surface", PERSONA_STYLE[persona.kind].rail)}>
+                <blockquote className={cn("border-l-[3px] pl-4 text-body-lg text-on-surface", PERSONA_STYLE[persona.kind].rail)}>
                   “{f.reaction}”
                 </blockquote>
                 <dl className="grid gap-3 text-body-md sm:grid-cols-2">
@@ -47,7 +47,7 @@ export function PersonaFeedbackGrid({ result, number }: { result: AnalysisResult
                   {f.whatLanded.length > 0 && <Facts title="전달된 것" items={f.whatLanded} />}
                 </dl>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-body-sm text-on-surface-variant">
-                  <span>핵심 메시지 {f.receivedKeyMessage ? "알아들었어요" : "놓쳤어요"}</span>
+                  <span className={u.tone}>{u.label}</span>
                   {stuckCount > 0 && (
                     <a
                       href="#sections-title"

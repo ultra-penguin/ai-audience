@@ -210,6 +210,23 @@ export const DifficultyCategorySchema = z.enum([
 ]);
 export type DifficultyCategory = z.infer<typeof DifficultyCategorySchema>;
 
+/** Why a listener got confused, classified by the audience simulation (never "it was hard"). */
+export const ConfusionCauseSchema = z.enum([
+  "TERM_CONFUSION",
+  "CONCEPT_CONFUSION",
+  "CONNECTION_CONFUSION",
+  "PURPOSE_CONFUSION",
+  "EXAMPLE_GAP",
+  "CONTEXT_GAP",
+  "LOGIC_GAP",
+  "REFERENCE_GAP",
+]);
+export type ConfusionCause = z.infer<typeof ConfusionCauseSchema>;
+
+/** Calibrated confidence of a simulated reaction; shown as words, never as a score. */
+export const LikelihoodSchema = z.enum(["high", "likely", "possible", "unlikely", "uncertain"]);
+export type Likelihood = z.infer<typeof LikelihoodSchema>;
+
 export const SectionReactionSchema = z.object({
   personaId: z.string(),
   reaction: z.string(),
@@ -229,6 +246,10 @@ export const DifficultSectionSchema = z.object({
   /** Audience perspective → difficult point → reason → improvement. */
   reactions: z.array(SectionReactionSchema),
   reason: z.string(),
+  /** Simulation only: classified cause, how likely listeners reacted this way, and why listeners differed. */
+  cause: ConfusionCauseSchema.optional().catch(undefined),
+  likelihood: LikelihoodSchema.optional().catch(undefined),
+  pattern: z.string().optional(),
   improvement: z.object({
     suggestion: z.string(),
     rewrite: z.string().optional(),
@@ -330,6 +351,30 @@ export const AnalysisDiscoverySchema = z.object({
 });
 export type AnalysisDiscovery = z.infer<typeof AnalysisDiscoverySchema>;
 
+/** A turning point in how the audience experienced the talk. */
+export const KeyMomentSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["first_drop", "interest_peak", "common_question"]),
+  startSec: z.number().min(0),
+  title: z.string(),
+  detail: z.string(),
+  /** Presentation-map section and, when it overlaps one, the difficult section to jump to. */
+  sectionId: z.string().optional(),
+  difficultSectionId: z.string().optional(),
+  personaIds: z.array(z.string()),
+});
+export type KeyMoment = z.infer<typeof KeyMomentSchema>;
+
+/** A question a real listener would plausibly have had at that point in the talk. */
+export const NaturalQuestionSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  personaIds: z.array(z.string()),
+  sectionId: z.string().optional(),
+  startSec: z.number().min(0).optional(),
+});
+export type NaturalQuestion = z.infer<typeof NaturalQuestionSchema>;
+
 export const AnalysisResultSchema = z.object({
   presentationId: z.string(),
   title: z.string(),
@@ -352,5 +397,9 @@ export const AnalysisResultSchema = z.object({
   sectionAnalyses: z.array(SectionAudienceAnalysisSchema).optional(),
   /** Phase 4, optional: the biggest discovery, written by the cross-check step. */
   discovery: DiscoverySchema.optional().catch(undefined),
+  /** Audience simulation, optional: turning points in speaking order. */
+  keyMoments: z.array(KeyMomentSchema).optional().catch(undefined),
+  /** Audience simulation, optional: only questions listeners would plausibly have had. */
+  naturalQuestions: z.array(NaturalQuestionSchema).optional().catch(undefined),
 });
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;

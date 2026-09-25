@@ -9,14 +9,15 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError, isNotFoundError } from "@/shared/api";
-import { formatDurationLong } from "@/lib/utils";
-import { mapSections } from "@/features/result/story";
+import { cn, formatDurationLong } from "@/lib/utils";
+import { biggestDiscovery, mapSections } from "@/features/result/story";
+import { KeyMoments, NaturalQuestionsSection } from "./audience-moments";
 import { DifficultSections } from "./difficult-sections";
 import { ImprovementsSection } from "./improvements-section";
 import { PersonaFeedbackGrid } from "./persona-feedback-grid";
 import { DiscoverySection, PresentationMapSection } from "./story-sections";
 import { SuggestionsSection } from "./suggestions-section";
-import { SummarySection } from "./summary-section";
+import { AudienceSnapshot, Strengths, SummarySection } from "./summary-section";
 import { TranscriptSection } from "./transcript-section";
 
 export function ResultView({ id }: { id: string }) {
@@ -88,21 +89,25 @@ export function ResultView({ id }: { id: string }) {
   const hasFixes = result.difficultSections.length > 0;
   const hasSuggestions = result.missingExplanations.length > 0 || result.exampleSuggestions.length > 0;
   const hasMap = mapSections(result).length > 0;
+  const hasDiscovery = biggestDiscovery(result) !== null;
   let chapter = 0;
   const mapNo = hasMap ? ++chapter : 0;
   const voicesNo = ++chapter;
   const sectionsNo = ++chapter;
   const fixesNo = hasFixes ? ++chapter : 0;
   const suggestionsNo = hasSuggestions ? ++chapter : 0;
+  const questionsNo = result.naturalQuestions?.length ? ++chapter : 0;
 
   return (
     <Container>
-      <header className="space-y-4 border-b border-outline-variant/60 pb-10">
+      <header className="space-y-3 border-b border-outline-variant/60 pb-6">
         <p className="text-label-md text-primary">발표 리뷰 리포트</p>
-        <h1 className="max-w-3xl text-[2.75rem] font-semibold leading-[1.06] tracking-[-0.04em] text-on-surface text-balance sm:text-[4.25rem]">{result.title}</h1>
-        <p className="text-body-md text-on-surface-variant">
-          {formatDurationLong(result.durationSec)} · 관중 {result.personas.length}명이 들었어요
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <h1 className="max-w-3xl text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-on-surface text-balance sm:text-[3.5rem]">{result.title}</h1>
+          <p className="shrink-0 text-body-sm text-on-surface-variant sm:pb-1">
+            {formatDurationLong(result.durationSec)} · 관중 {result.personas.length}명
+          </p>
+        </div>
       </header>
 
       {result.isSample && (
@@ -111,13 +116,24 @@ export function ResultView({ id }: { id: string }) {
         </Notice>
       )}
 
-      <SummarySection result={result} />
-      <DiscoverySection result={result} />
+      {/* First screen: what happened, the biggest discovery and how each listener took it, side by side. */}
+      <div className="space-y-6">
+        <SummarySection result={result} />
+        <div className={cn("grid gap-x-14 gap-y-8 lg:gap-x-16 xl:gap-x-20", hasDiscovery && "lg:grid-cols-[minmax(0,1.45fr)_minmax(19rem,1fr)]")}>
+          {hasDiscovery && <DiscoverySection result={result} />}
+          <div className="lg:border-l lg:border-outline-variant/60 lg:pl-8 xl:pl-10">
+            <AudienceSnapshot result={result} />
+          </div>
+        </div>
+        <KeyMoments result={result} />
+        <Strengths result={result} />
+      </div>
       {hasMap && <PresentationMapSection result={result} number={mapNo} />}
       <PersonaFeedbackGrid result={result} number={voicesNo} />
       <DifficultSections result={result} number={sectionsNo} />
       {hasFixes && <ImprovementsSection result={result} number={fixesNo} />}
       {hasSuggestions && <SuggestionsSection result={result} number={suggestionsNo} />}
+      {questionsNo > 0 && <NaturalQuestionsSection result={result} number={questionsNo} />}
       <TranscriptSection result={result} />
 
       <section aria-labelledby="next-title" className="flex flex-col items-start gap-4 rounded-xl bg-surface-container-low p-6 md:flex-row md:items-center md:justify-between">
@@ -136,7 +152,7 @@ export function ResultView({ id }: { id: string }) {
 }
 
 function Container({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-7xl space-y-20 px-4 py-12 sm:px-6 md:py-16 lg:px-10">{children}</div>;
+  return <div className="mx-auto max-w-7xl space-y-12 px-4 py-8 sm:px-6 md:py-10 lg:px-10">{children}</div>;
 }
 
 function ResultSkeleton() {

@@ -1,4 +1,4 @@
-import type { DifficultSection, Persona } from "@/shared/api/types";
+import type { ConfusionCause, DifficultSection, Likelihood, Persona } from "@/shared/api/types";
 import { PersonaChip } from "@/components/ui/persona-chip";
 import { cn, formatDuration } from "@/lib/utils";
 
@@ -10,6 +10,32 @@ export const CATEGORY_LABEL: Record<NonNullable<DifficultSection["category"]>, s
   abstract: "추상적 설명",
   key_message: "핵심 메시지",
 };
+
+/** The simulation's classified cause of confusion; preferred over the coarser category. */
+export const CAUSE_LABEL: Record<ConfusionCause, string> = {
+  TERM_CONFUSION: "낯선 용어",
+  CONCEPT_CONFUSION: "개념 이해 어려움",
+  CONNECTION_CONFUSION: "개념 사이 관계",
+  PURPOSE_CONFUSION: "왜 필요한지 모름",
+  EXAMPLE_GAP: "구체적인 사례 부족",
+  CONTEXT_GAP: "배경 설명 부족",
+  LOGIC_GAP: "논리 연결 부족",
+  REFERENCE_GAP: "설명 안 된 대상 참조",
+};
+
+/** Simulated reactions are estimates: always say how likely, never state them as fact. */
+export const LIKELIHOOD_LABEL: Record<Likelihood, string> = {
+  high: "높은 확률",
+  likely: "가능성이 높음",
+  possible: "가능성이 있음",
+  unlikely: "가능성이 낮음",
+  uncertain: "판단하기 어려움",
+};
+
+export function issueLabel(section: Pick<DifficultSection, "cause" | "category">): string {
+  if (section.cause) return CAUSE_LABEL[section.cause];
+  return section.category ? CATEGORY_LABEL[section.category] : "설명이 더 필요한 구간";
+}
 
 export function Highlighted({ text, highlight }: { text: string; highlight?: string }) {
   const at = highlight ? text.indexOf(highlight) : -1;
@@ -57,11 +83,11 @@ export function FeedbackChain({
   compact?: boolean;
 }) {
   const byId = new Map(personas.map((p) => [p.id, p]));
-  const categoryLabel = section.category ? CATEGORY_LABEL[section.category] : "설명이 더 필요한 구간";
+  const categoryLabel = issueLabel(section);
 
   return (
     <ol className={cn(compact ? "text-body-md" : "text-body-lg")}>
-      <Step index={1} label="관중의 반응">
+      <Step index={1} label={section.likelihood ? `관중의 반응 · ${LIKELIHOOD_LABEL[section.likelihood]}` : "관중의 반응"}>
         {section.reactions.length > 0 ? (
           <ul className="space-y-3">
             {section.reactions.map((r) => {
@@ -87,6 +113,12 @@ export function FeedbackChain({
 
       <Step index={3} label={`이유 · ${categoryLabel}`}>
         <p className="text-on-surface">{section.reason}</p>
+        {section.pattern && (
+          <p className="text-body-md text-on-surface-variant">
+            <span className="text-label-md text-on-surface">관중마다 달랐던 이유 · </span>
+            {section.pattern}
+          </p>
+        )}
       </Step>
 
       <Step index={4} label="이렇게 고쳐보세요" last>

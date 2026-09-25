@@ -58,6 +58,8 @@ export function AnalysisProgress({ id }: { id: string }) {
   const detailed = hasStepDetail(pipeline);
   const timeline = analysisTimeline(status.data);
   const running = runningItem(timeline);
+  // Side-by-side only once the structure step has reported sections; otherwise the right column would be empty.
+  const hasMap = detailed && (pipeline.sections?.length ?? 0) > 0;
 
   useEffect(() => {
     if (completed) router.replace(`/result/${encodeURIComponent(id)}`);
@@ -101,65 +103,72 @@ export function AnalysisProgress({ id }: { id: string }) {
         <p className="text-body-md text-on-surface-variant">{captionFor(status.data)}</p>
       </section>
 
-      <section className="border-y border-outline-variant/60 py-6 sm:py-8">
-        <p role="status" aria-live="polite" className="sr-only">
-          {status.isPending
-            ? "분석 상태를 확인하고 있어요."
-            : completed
-              ? "분석이 끝났어요. 결과 화면으로 이동해요."
-              : failed
-                ? "분석에 실패했어요."
-                : running
-                  ? `${running.label} 단계예요.`
-                  : "분석 상태를 확인하고 있어요."}
-        </p>
+      <div className={cn("grid gap-x-10 gap-y-6", hasMap && "lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start")}>
+        <section className="border-y border-outline-variant/60 py-4">
+          <p role="status" aria-live="polite" className="sr-only">
+            {status.isPending
+              ? "분석 상태를 확인하고 있어요."
+              : completed
+                ? "분석이 끝났어요. 결과 화면으로 이동해요."
+                : failed
+                  ? "분석에 실패했어요."
+                  : running
+                    ? `${running.label} 단계예요.`
+                    : "분석 상태를 확인하고 있어요."}
+          </p>
 
-        <h2 className="sr-only">분석 단계</h2>
-        <ol className="space-y-1">
-          {timeline.map((item, i) => (
-            <TimelineRow
-              key={item.key}
-              item={item}
-              index={i}
-              // The backend's own explanation replaces the generic copy for the running step.
-              detail={item === running && detailed && pipeline.message ? pipeline.message : item.detail}
-            />
-          ))}
-        </ol>
+          <h2 className="sr-only">분석 단계</h2>
+          <ol className="space-y-0.5">
+            {timeline.map((item, i) => (
+              <TimelineRow
+                key={item.key}
+                item={item}
+                index={i}
+                // The backend's own explanation replaces the generic copy for the running step.
+                detail={item === running && detailed && pipeline.message ? pipeline.message : item.detail}
+              />
+            ))}
+          </ol>
 
-        {failed && (
-          <Notice
-            tone="error"
-            className="mt-6"
-            title="분석을 마치지 못했어요"
-            actions={
-              <>
-                <Button size="sm" onClick={() => retry.mutate()} disabled={retry.isPending}>
-                  {retry.isPending && <Spinner />}
-                  다시 분석하기
-                </Button>
-                <Link href="/record" className={buttonVariants({ size: "sm", variant: "secondary" })}>
-                  새로 녹음하기
-                </Link>
-              </>
-            }
-          >
-            {status.data?.error ? safeErrorMessage(status.data.error.code) : "일시적인 문제일 수 있어요."} 녹음은 서버에 남아 있어서 다시 올릴 필요 없어요.
-            {retry.isError && " 재시도 요청도 실패했어요. 잠시 후 다시 눌러 주세요."}
-          </Notice>
-        )}
+          {failed && (
+            <Notice
+              tone="error"
+              className="mt-4"
+              title="분석을 마치지 못했어요"
+              actions={
+                <>
+                  <Button size="sm" onClick={() => retry.mutate()} disabled={retry.isPending}>
+                    {retry.isPending && <Spinner />}
+                    다시 분석하기
+                  </Button>
+                  <Link href="/record" className={buttonVariants({ size: "sm", variant: "secondary" })}>
+                    새로 녹음하기
+                  </Link>
+                </>
+              }
+            >
+              {status.data?.error ? safeErrorMessage(status.data.error.code) : "일시적인 문제일 수 있어요."} 녹음은 서버에 남아 있어서 다시 올릴 필요 없어요.
+              {retry.isError && " 재시도 요청도 실패했어요. 잠시 후 다시 눌러 주세요."}
+            </Notice>
+          )}
 
-        {completed && (
-          <div className="mt-6 flex justify-end">
-            <Link href={`/result/${encodeURIComponent(id)}`} className={buttonVariants()}>
-              결과 보기
-            </Link>
+          {completed && (
+            <div className="mt-4 flex justify-end">
+              <Link href={`/result/${encodeURIComponent(id)}`} className={buttonVariants()}>
+                결과 보기
+              </Link>
+            </div>
+          )}
+        </section>
+
+        {detailed && status.data && (
+          <div className="space-y-6">
+            <NowListening status={status.data} />
+            <StructureProgress status={status.data} />
           </div>
         )}
-      </section>
+      </div>
 
-      {detailed && status.data && <NowListening status={status.data} />}
-      {detailed && <StructureProgress status={status.data!} />}
       {detailed && <InsightCards pipeline={pipeline} />}
 
       {!failed && !completed && (
@@ -183,11 +192,11 @@ function TimelineRow({ item, index, detail }: { item: TimelineItem; index: numbe
   const { state } = item;
   const active = state === "running";
   return (
-    <li aria-current={active ? "step" : undefined} className={cn("flex gap-4 rounded-lg p-3", active && "bg-surface-container-low")}>
+    <li aria-current={active ? "step" : undefined} className={cn("flex gap-3 rounded-lg px-3 py-2 transition-colors duration-200", active && "bg-surface-container-low")}>
       <span
         aria-hidden
         className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-full text-label-md",
+          "flex size-7 shrink-0 items-center justify-center rounded-full text-label-md transition-colors duration-200",
           state === "done" && "bg-secondary text-on-secondary",
           active && "bg-primary-container text-on-primary",
           state === "failed" && "bg-error text-on-error",
@@ -196,7 +205,7 @@ function TimelineRow({ item, index, detail }: { item: TimelineItem; index: numbe
       >
         {state === "done" ? <Check className="size-4" /> : active ? <Spinner /> : state === "failed" ? "!" : state === "skipped" ? "–" : index + 1}
       </span>
-      <div className="min-w-0 pt-1">
+      <div className="min-w-0 pt-0.5">
         <p className={cn("text-label-lg", state === "pending" || state === "skipped" ? "text-on-surface-variant" : "text-on-surface")}>
           {item.label}
           <span className="sr-only">{STATE_SR[state]}</span>
@@ -239,11 +248,11 @@ function NowListening({ status }: { status: AnalysisStatus }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-4 py-12 sm:px-6 md:py-16 lg:px-10">
-      <div className="max-w-3xl space-y-3">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 md:py-10 lg:px-10">
+      <div className="max-w-3xl space-y-2">
         <p className="text-label-md text-primary">AI 관중 시뮬레이션</p>
-        <h1 className="text-[2.75rem] font-semibold leading-[1.06] tracking-[-0.04em] text-on-surface sm:text-[4rem]">발표를 읽고 있어요.</h1>
-        <p className="max-w-2xl text-body-lg text-on-surface-variant">비전공·일반·전문가 관중이 같은 발표를 각자의 시선으로 듣고, 막히는 곳을 찾는 중입니다.</p>
+        <h1 className="text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-on-surface sm:text-[3rem]">발표를 읽고 있어요.</h1>
+        <p className="max-w-2xl text-body-md text-on-surface-variant">비전공·일반·전문가 관중이 같은 발표를 각자의 시선으로 듣고, 막히는 곳을 찾는 중입니다.</p>
       </div>
       {children}
     </div>

@@ -58,7 +58,11 @@ export function DiscoverySection({ result }: { result: AnalysisResult }) {
   const isPriority = difficult?.id === result.summary.priorityFixSectionId;
 
   return (
-    <section aria-labelledby="discovery-title" className="space-y-6 border-y-2 border-primary py-8 sm:py-10">
+    <section
+      aria-labelledby="discovery-title"
+      className="animate-rise-in space-y-3 border-l-2 border-primary pl-5 motion-reduce:animate-none"
+      style={{ animationDelay: "60ms" }}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <h2 id="discovery-title" className="text-label-lg text-primary">
           가장 큰 발견
@@ -68,7 +72,7 @@ export function DiscoverySection({ result }: { result: AnalysisResult }) {
         </span>
       </div>
       <p className="max-w-3xl text-headline-md text-on-surface text-pretty">{discovery.headline}</p>
-      {discovery.detail && <p className="max-w-2xl text-body-lg text-on-surface-variant">{discovery.detail}</p>}
+      {discovery.detail && <p className="max-w-2xl text-body-md text-on-surface-variant">{discovery.detail}</p>}
 
       {people.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -115,7 +119,7 @@ function Legend() {
 function Heatmap({ result, sections }: { result: AnalysisResult; sections: MapSection[] }) {
   const index = heatmapIndex(result);
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <table className="w-full min-w-[20rem] border-separate border-spacing-1 text-left">
           <caption className="sr-only">관중별·구간별 이해 정도</caption>
@@ -135,8 +139,8 @@ function Heatmap({ result, sections }: { result: AnalysisResult; sections: MapSe
             </tr>
           </thead>
           <tbody>
-            {result.personas.map((p) => (
-              <tr key={p.id}>
+            {result.personas.map((p, row) => (
+              <tr key={p.id} className="animate-rise-in motion-reduce:animate-none" style={{ animationDelay: `${row * 50}ms` }}>
                 <th scope="row" className="whitespace-nowrap pr-2 text-label-md font-medium text-on-surface">
                   <span className="inline-flex items-center gap-1.5">
                     <span aria-hidden className={cn("size-1.5 rounded-full", PERSONA_STYLE[p.kind].dot)} />
@@ -150,7 +154,7 @@ function Heatmap({ result, sections }: { result: AnalysisResult; sections: MapSe
                       key={s.id}
                       title={cell?.evidence}
                       className={cn(
-                        "h-10 rounded-md px-2 text-center text-label-md",
+                        "h-8 rounded-md px-2 text-center text-label-md",
                         cell ? RECEPTION[cell.reception].cell : "bg-surface-container text-on-surface-variant",
                       )}
                     >
@@ -174,18 +178,18 @@ function Splits({ result }: { result: AnalysisResult }) {
   if (splits.length === 0) return null;
   const byId = new Map(result.personas.map((p) => [p.id, p]));
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <h3 className="text-headline-sm text-on-surface">관중 반응이 갈린 곳</h3>
-      <ul className="space-y-3">
+      <ul>
         {splits.map(({ section, cells }) => (
-          <li key={section.id} className="space-y-3 border-t border-outline-variant/60 py-5 first:border-t-0">
+          <li key={section.id} className="space-y-2.5 border-t border-outline-variant/60 py-4 first:border-t-0 first:pt-2">
             <p className="flex flex-wrap items-baseline gap-2">
               <a href={`#${mapAnchor(section.id)}`} className="rounded text-label-lg text-on-surface underline-offset-4 hover:underline">
                 {section.title}
               </a>
               {timeRange(section) && <span className="text-label-md tabular-nums text-on-surface-variant">{timeRange(section)}</span>}
             </p>
-            <ul className="grid gap-3 md:grid-cols-3">
+            <ul className="grid gap-x-6 gap-y-3 md:grid-cols-3">
               {cells.map((c) => {
                 const persona = byId.get(c.personaId);
                 if (!persona) return null;
@@ -195,7 +199,7 @@ function Splits({ result }: { result: AnalysisResult }) {
                       <PersonaChip persona={persona} />
                       <span className={cn("rounded px-1.5 py-0.5 text-label-sm", RECEPTION[c.reception].cell)}>{RECEPTION[c.reception].label}</span>
                     </p>
-                    {c.evidence && <p className="text-body-md text-on-surface">“{c.evidence}”</p>}
+                    {c.evidence && <p className="text-body-sm text-on-surface">“{c.evidence}”</p>}
                   </li>
                 );
               })}
@@ -218,7 +222,7 @@ export function PresentationMapSection({ result, number }: { result: AnalysisRes
   const difficultIds = new Set(result.difficultSections.map((s) => s.id));
 
   return (
-    <section aria-labelledby="map-title" className="space-y-6">
+    <section aria-labelledby="map-title" className="space-y-4">
       <ReportHeading id="map-title" number={number} title="발표 지도">
         발표를 흐름에 따라 {sections.length}개 구간으로 나눴어요.
         {hasHeatmap ? " 구간마다 관중이 얼마나 따라왔는지 함께 보여드려요." : ""}
@@ -226,7 +230,7 @@ export function PresentationMapSection({ result, number }: { result: AnalysisRes
 
       {hasHeatmap && <Heatmap result={result} sections={sections} />}
 
-      <ol className="space-y-2">
+      <ol className="grid gap-0 sm:grid-cols-2 xl:grid-cols-4">
         {sections.map((s, i) => {
           const segmentIds = linkableSegmentIds(result, s);
           const difficult = (s.difficultSectionIds ?? []).filter((id) => difficultIds.has(id));
@@ -234,7 +238,8 @@ export function PresentationMapSection({ result, number }: { result: AnalysisRes
             <li
               key={s.id}
               id={mapAnchor(s.id)}
-              className="grid scroll-mt-24 grid-cols-[1.75rem_1fr] gap-3 border-t border-outline-variant/50 py-5 target:bg-surface-container-low sm:p-6"
+              className="animate-rise-in relative grid scroll-mt-24 grid-cols-[1.75rem_1fr] gap-3 border-t border-outline-variant/50 px-2 py-3 target:bg-surface-container-low motion-reduce:animate-none sm:px-3 sm:py-4 xl:border-t-0 xl:border-l xl:[&:nth-child(4n+1)]:border-l-0 xl:[&:nth-child(n+5)]:border-t"
+              style={{ animationDelay: `${120 + i * 45}ms` }}
             >
               <span aria-hidden className="flex size-7 items-center justify-center rounded-full bg-surface-container text-label-md tabular-nums text-on-surface-variant">
                 {i + 1}

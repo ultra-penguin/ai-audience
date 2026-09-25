@@ -1,6 +1,6 @@
 "use client";
 
-import { Mic, Pause, Play, RotateCcw, Sparkles, Square } from "lucide-react";
+import { FileText, Mic, Pause, Play, RotateCcw, Sparkles, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId } from "react";
 import { useSubmitPresentation } from "@/features/presentation/queries";
@@ -66,19 +66,24 @@ export function RecordingStudio() {
     reset();
   };
 
+  const handleExampleScript = () => {
+    reset();
+    router.push(`/analyzing/demo-script-${Date.now().toString(36)}`);
+  };
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16 lg:px-10">
-      <div className="mx-auto max-w-4xl space-y-10">
-        <div className="flex flex-col justify-between gap-6 border-b border-outline-variant/60 pb-8 sm:flex-row sm:items-end">
-          <div className="space-y-3">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10 lg:px-10">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="flex flex-col justify-between gap-4 border-b border-outline-variant/60 pb-6 sm:flex-row sm:items-end">
+          <div className="space-y-2">
             <p className="text-label-md text-primary">새 발표</p>
-            <h1 className="text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.035em] text-on-surface sm:text-[3.5rem]">발표할 준비가 되었나요?</h1>
-            <p className="max-w-xl text-body-lg text-on-surface-variant">평소 발표하듯 말해 주세요. 녹음을 마치면 가상 관중이 같은 발표를 들어요.</p>
+            <h1 className="text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-on-surface sm:text-[3rem]">발표할 준비가 되었나요?</h1>
+            <p className="max-w-xl text-body-md text-on-surface-variant">평소 발표하듯 말해 주세요. 녹음을 마치면 가상 관중이 같은 발표를 들어요.</p>
           </div>
           <p className="max-w-[14rem] text-body-sm text-on-surface-variant sm:text-right">마이크 권한만 허용하면 바로 시작할 수 있어요.</p>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label htmlFor={titleId} className="text-label-lg text-on-surface">
             발표 제목 <span className="text-on-surface-variant">(선택)</span>
           </label>
@@ -93,8 +98,8 @@ export function RecordingStudio() {
           />
         </div>
 
-        <section className="rounded-[2rem] bg-surface-container-low px-5 py-10 sm:px-10 sm:py-16">
-          <div className="flex flex-col items-center gap-7 text-center">
+        <section className="rounded-[2rem] bg-surface-container-low px-5 py-8 sm:px-10 sm:py-10">
+          <div className="flex flex-col items-center gap-5 text-center">
             <p role="status" className="flex items-center gap-2 text-label-lg text-on-surface">
               {status === "recording" && <span aria-hidden className="size-2.5 animate-pulse rounded-full bg-error" />}
               {status === "paused" && <span aria-hidden className="size-2.5 rounded-full bg-outline" />}
@@ -104,7 +109,7 @@ export function RecordingStudio() {
 
             <p
               className={cn(
-                "font-display text-[4.5rem] leading-none font-semibold tabular-nums tracking-[-0.06em] sm:text-[6.5rem]",
+                "font-display text-[4rem] leading-none font-semibold tabular-nums tracking-[-0.06em] transition-colors duration-200 sm:text-[5.5rem]",
                 status === "paused" ? "text-on-surface-variant" : "text-on-surface",
               )}
               aria-label={`녹음 시간 ${formatDurationLong(elapsedMs / 1000)}`}
@@ -119,10 +124,18 @@ export function RecordingStudio() {
             )}
 
             {(status === "idle" || status === "requesting") && (
-              <Button size="lg" onClick={start} disabled={status === "requesting"} className="h-16 min-w-52 rounded-full px-8">
-                <Mic aria-hidden />
-                녹음 시작
-              </Button>
+              <div className="flex flex-col items-center gap-3">
+                <Button size="lg" onClick={start} disabled={status === "requesting"} className="h-16 min-w-52 rounded-full px-8">
+                  <Mic aria-hidden />
+                  녹음 시작
+                </Button>
+                {status === "idle" && (
+                  <Button variant="ghost" size="sm" onClick={handleExampleScript}>
+                    <FileText aria-hidden />
+                    예시 대본으로 화면 보기
+                  </Button>
+                )}
+              </div>
             )}
 
             {isLive && (
@@ -146,7 +159,7 @@ export function RecordingStudio() {
             )}
 
             {status === "stopped" && recording && (
-              <div className="w-full space-y-4 text-left">
+              <div className="w-full animate-rise-in space-y-3 text-left motion-reduce:animate-none">
                 <audio controls src={recording.url} className="w-full" aria-label="녹음 다시 듣기" />
                 <p className="text-body-md text-on-surface-variant">
                   총 {formatDurationLong(recording.durationSec)} 분량이에요. 들어보고 괜찮으면 분석을 시작하세요.
@@ -196,7 +209,7 @@ export function RecordingStudio() {
         </section>
       </div>
 
-      <aside aria-labelledby="tips-title" className="mx-auto mt-10 grid max-w-4xl gap-4 border-t border-outline-variant/60 pt-6 sm:grid-cols-3">
+      <aside aria-labelledby="tips-title" className="mx-auto mt-6 grid max-w-4xl gap-3 border-t border-outline-variant/60 pt-4 sm:grid-cols-3">
         <h2 id="tips-title" className="text-label-lg text-on-surface">녹음 전에</h2>
         <ul className="space-y-2 sm:col-span-2 sm:grid sm:grid-cols-3 sm:gap-5 sm:space-y-0">
           {TIPS.map((tip) => (

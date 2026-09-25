@@ -20,6 +20,28 @@ const personaResponse = JSON.stringify({
   improvements: [],
 });
 
+function simulated(sectionId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    sectionId,
+    stateBefore: "앞 구간까지 흐름을 따라온 상태예요.",
+    newInformation: "새로운 설명이 나와요.",
+    stateAfter: "흐름을 따라가고 있어요.",
+    reaction: "NO_SIGNIFICANT_CHANGE",
+    understanding: "followed",
+    agreement: "neutral",
+    cause: null,
+    evidence: "첫 번째 문장입니다.",
+    naturalReaction: "큰 변화 없이 들었을 가능성이 높아요.",
+    likelihood: "likely",
+    salience: { understanding: false, attention: false, keyMessage: false, natural: false, improvable: false },
+    question: null,
+    mentalModelGap: null,
+    recovery: null,
+    improvement: null,
+    ...overrides,
+  };
+}
+
 const speechToText: SpeechToTextProvider = {
   transcribe: async () => ({ text: "첫 번째 문장입니다. 두 번째 문장입니다.", segments: [{ startSeconds: 0, endSeconds: 2, text: "첫 번째 문장입니다." }] }),
 };
@@ -92,33 +114,19 @@ describe("real analysis provider", () => {
           });
         }
         return JSON.stringify({
-          overallReaction: "도입은 이해했지만 핵심 개념은 설명이 더 필요합니다.",
+          overallExperience: "도입은 따라왔지만 핵심 개념에서 연결이 약해졌을 가능성이 있어요.",
           sections: [
-            {
-              sectionId: "intro",
-              understanding: "followed",
-              comprehensionScore: 80,
-              attentionScore: 78,
-              reaction: "도입의 주제는 이해했습니다.",
-              evidence: "첫 번째 문장입니다.",
-              reason: "주제가 직접적으로 소개되었습니다.",
-              blockers: [],
-              questions: [],
-              needsExample: false,
-            },
-            {
-              sectionId: "concept",
+            simulated("intro", { stateAfter: "발표 주제를 이해했어요.", evidence: "첫 번째 문장입니다." }),
+            simulated("concept", {
+              reaction: "CONFUSION",
               understanding: "partly_lost",
-              comprehensionScore: 58,
-              attentionScore: 60,
-              reaction: "핵심 개념을 한 번 더 풀어 설명해 주세요.",
+              cause: "EXAMPLE_GAP",
+              stateAfter: "핵심 개념의 정의는 들었지만 실제로 어떻게 쓰이는지 떠올리지 못했어요.",
               evidence: "두 번째 문장입니다.",
-              reason: "개념의 정의가 짧습니다.",
-              blockers: ["핵심 개념의 정의가 부족합니다."],
-              questions: ["실제 예시는 무엇인가요?"],
-              needsExample: true,
-              improvement: { title: "개념을 먼저 정의하기", problem: "정의가 짧습니다.", action: "쉬운 말로 정의하세요.", example: "일상적인 사례를 덧붙이세요." },
-            },
+              salience: { understanding: true, attention: false, keyMessage: true, natural: true, improvable: true },
+              question: "실제 예시는 무엇인가요?",
+              improvement: { title: "개념을 먼저 정의하기", action: "쉬운 말로 정의하세요.", example: "일상적인 사례를 덧붙이세요." },
+            }),
           ],
         });
       },
@@ -139,6 +147,8 @@ describe("real analysis provider", () => {
     expect(result.structure?.sections.map((section) => section.id)).toEqual(["intro", "concept"]);
     expect(result.sectionAnalyses).toHaveLength(6);
     expect(result.discovery?.sectionId).toBe("concept");
+    expect(result.difficultSections).toEqual([expect.objectContaining({ sectionId: "concept", cause: "EXAMPLE_GAP", salience: "SIGNIFICANT", personaIds: ["beginner", "peer", "specialist"] })]);
+    expect(result.naturalQuestions).toEqual([{ question: "실제 예시는 무엇인가요?", sectionId: "concept", personaIds: ["beginner", "peer", "specialist"] }]);
     expect(stages).toContain("evaluating:persona:persona");
     expect(stages).toContain("cross_check:cross_check:cross_check");
   });

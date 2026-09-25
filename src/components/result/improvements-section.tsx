@@ -3,7 +3,7 @@ import type { AnalysisResult, DifficultSection, Persona } from "@/shared/api/typ
 import { sectionsByFixOrder, stumbleText } from "@/features/result/report";
 import { PersonaChip } from "@/components/ui/persona-chip";
 import { cn, formatDuration } from "@/lib/utils";
-import { CATEGORY_LABEL } from "./feedback-chain";
+import { issueLabel } from "./feedback-chain";
 import { ReportHeading, SectionLink } from "./report-parts";
 
 /** What was said next to the rewrite the analysis suggested, when there is one. */
@@ -70,7 +70,7 @@ export function ImprovementsSection({ result, number }: { result: AnalysisResult
                 <span aria-hidden className="text-label-md tabular-nums text-on-surface-variant">
                   {i + 1}.
                 </span>
-                <span className="text-label-lg text-on-surface">{s.category ? CATEGORY_LABEL[s.category] : "설명이 더 필요한 구간"}</span>
+                <span className="text-label-lg text-on-surface">{issueLabel(s)}</span>
                 <span className="rounded bg-surface-container px-1.5 py-0.5 text-label-md tabular-nums text-on-surface-variant">
                   {formatDuration(s.startSec)}
                 </span>

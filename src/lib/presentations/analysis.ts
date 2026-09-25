@@ -7,10 +7,32 @@ import {
   sectionAudienceAnalysisSchema,
   type AnalysisDiscovery,
   type AnalysisResult,
-  type SectionAudienceAnalysis,
   type StructureSection,
   type TranscriptSegment,
 } from "./schemas";
+import {
+  calibrateLikelihood,
+  CONFUSION_LABEL,
+  formatTimestamp,
+  internalScores,
+  isIssue,
+  keyMoments,
+  naturalQuestions,
+  patternFallback,
+  PERSONA_MODELS,
+  personaPrompt,
+  presentationContext,
+  salienceLevel,
+  selectIssues,
+  SIMULATION_SYSTEM_RULES,
+  simulationKoreanStrings,
+  simulationResponseSchema,
+  type AudienceIssue,
+  type ConfusionType,
+  type PersonaId,
+  type PersonaSimulation,
+  type SimulationResponse,
+} from "./audience-simulation";
 import {
   createConfiguredProviders,
   ProviderError,
@@ -36,17 +58,17 @@ type ProgressContext = {
   pipeline?: AnalysisPipelineSnapshot;
 };
 
+/** Display identity only; how each listener thinks lives in PERSONA_MODELS. */
 type FixedPersona = {
   id: "beginner" | "peer" | "specialist";
   name: "비전공 관중" | "일반 관중" | "전문가 관중";
   perspective: string;
-  instructions: string;
 };
 
 export const FIXED_PERSONAS: readonly FixedPersona[] = [
-  { id: "beginner", name: "비전공 관중", perspective: "관련 배경지식이 많지 않아 발표자의 설명만으로 이해하려는 관중", instructions: "전문 용어를 모르는 관중의 입장에서 쉬운 말, 배경 설명, 구체적인 예시가 충분한지 살핍니다." },
-  { id: "peer", name: "일반 관중", perspective: "주제에 어느 정도 관심과 일반적인 업무 경험이 있는 관중", instructions: "발표의 흐름, 핵심 메시지, 집중을 유지할 수 있는 구조와 실용성을 살핍니다." },
-  { id: "specialist", name: "전문가 관중", perspective: "주제의 세부 내용과 근거, 한계를 검토할 수 있는 전문가 관중", instructions: "주장의 정확성, 근거, 전제, 예외와 방법의 구체성이 충분한지 살핍니다." },
+  { id: "beginner", name: "비전공 관중", perspective: "관련 배경지식이 많지 않아 발표자의 설명만으로 이해하려는 관중" },
+  { id: "peer", name: "일반 관중", perspective: "주제에 어느 정도 관심과 일반적인 업무 경험이 있는 관중" },
+  { id: "specialist", name: "전문가 관중", perspective: "주제의 세부 내용과 근거, 한계를 검토할 수 있는 전문가 관중" },
 ] as const;
 
 function pipelineSnapshot(
@@ -189,7 +211,7 @@ function validateKoreanPersona(response: LlmPersonaResponse): LlmPersonaResponse
 }
 
 async function callPersonaModel(model: JsonLanguageModelProvider, persona: FixedPersona, transcript: string): Promise<LlmPersonaResponse> {
-  const system = `당신은 발표 리뷰 서비스의 ${persona.name}입니다. 실제 인간이라고 주장하지 말고, 하나의 고정된 관중 관점으로만 평가하세요. ${persona.instructions} 출력은 반드시 한국어로만 작성해야 합니다. ${JSON_INSTRUCTIONS}`;
+  const system = `당신은 발표를 듣는 ${persona.name}의 관중 시뮬레이션입니다. 발표 평가자가 아니며, 실제 인간이라고 주장하지 마세요. 이 관중의 지식과 목표를 가진 사람이 발표를 순서대로 들을 때 실제로 이해나 집중이 흔들린 지점만 보고하세요. 배경지식이 적다는 이유만으로 어렵다고 판단하지 말고, 단어 선택·말버릇·사소한 문법처럼 이해와 집중에 영향이 없는 문제는 무시하세요. blockers와 improvements는 가장 중요한 것 최대 3개만 쓰세요.\n${personaPrompt(persona.name, PERSONA_MODELS[persona.id])}\n출력은 반드시 한국어로만 작성해야 합니다. ${JSON_INSTRUCTIONS}`;
   const user = `다음 Transcript만 근거로 분석하세요. 제목, 파일명, 음성 메타데이터 또는 Transcript 밖의 정보를 추측하지 마세요. Transcript에 영어가 있더라도 결과 JSON의 설명 문장은 모두 한국어로 작성하세요.\n\nTranscript:\n${transcript}`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -219,51 +241,17 @@ function validateKoreanStructure(response: StructureModelResponse): StructureMod
   return response;
 }
 
-const sectionModelResponseSchema = z.object({
-  overallReaction: z.string().min(1),
-  sections: z.array(z.object({
-    sectionId: z.string().min(1),
-    understanding: z.enum(["followed", "partly_lost", "lost"]),
-    comprehensionScore: z.number().int().min(0).max(100),
-    attentionScore: z.number().int().min(0).max(100),
-    reaction: z.string().min(1),
-    evidence: z.string().min(1),
-    reason: z.string().min(1),
-    blockers: z.array(z.string().min(1)).max(6),
-    questions: z.array(z.string().min(1)).max(6),
-    needsExample: z.boolean(),
-    improvement: z.preprocess(
-      (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : null),
-      z.object({ title: z.string().min(1), problem: z.string().min(1), action: z.string().min(1), example: z.string().min(1) }).nullable(),
-    ),
-  })).min(1).max(12),
-}).strict();
-type SectionModelResponse = z.infer<typeof sectionModelResponseSchema>;
-
-function validateKoreanSection(response: SectionModelResponse): SectionModelResponse {
-  requireKoreanStrings([
-    response.overallReaction,
-    ...response.sections.flatMap((section) => [
-      section.reaction,
-      section.reason,
-      ...section.blockers,
-      ...section.questions,
-      ...(section.improvement ? [section.improvement.title, section.improvement.problem, section.improvement.action, section.improvement.example] : []),
-    ]),
-  ]);
-  return response;
-}
-
 const synthesisModelResponseSchema = z.object({
   headline: z.string().min(1),
   intendedKeyMessage: z.string().min(1),
   strengths: z.array(z.string().min(1)).max(6),
   discovery: analysisDiscoverySchema,
+  issues: z.array(z.object({ sectionId: z.string().min(1), why: z.string().min(1), pattern: z.string().min(1) })).max(8).default([]),
 }).strict();
 type SynthesisModelResponse = z.infer<typeof synthesisModelResponseSchema>;
 
 function validateKoreanSynthesis(response: SynthesisModelResponse): SynthesisModelResponse {
-  requireKoreanStrings([response.headline, response.intendedKeyMessage, ...response.strengths, response.discovery.title, response.discovery.detail]);
+  requireKoreanStrings([response.headline, response.intendedKeyMessage, ...response.strengths, response.discovery.title, response.discovery.detail, ...response.issues.flatMap((issue) => [issue.why, issue.pattern])]);
   return response;
 }
 
@@ -328,37 +316,95 @@ async function callStructureModel(model: JsonLanguageModelProvider, segments: Tr
   throw new ProviderError("analysis_invalid_output", "The structure analyzer returned invalid analysis data.");
 }
 
-async function callSectionPersonaModel(model: JsonLanguageModelProvider, persona: FixedPersona, structure: StructureSection[], segments: TranscriptSegment[]): Promise<SectionModelResponse> {
-  const excerpts = structure.map((section) => ({ sectionId: section.id, title: section.title, summary: section.summary, transcript: section.segmentIds.map((id) => segments.find((segment) => segment.id === id)?.text ?? "").join(" ") }));
-  const system = `당신은 ${persona.name} 관점의 발표 관중 시뮬레이터입니다. ${persona.instructions} 전체 발표를 한 번에 점수화하지 말고, 주어진 구간마다 실제 transcript 근거를 찾아 평가하세요. 실제 인간이라고 주장하지 말고, 관중 관점의 시뮬레이션임을 유지하세요. ${KOREAN_JSON_RULE}
-아래 JSON 형식만 반환하세요:
-{"overallReaction":"전체적으로 들은 느낌","sections":[{"sectionId":"intro","understanding":"followed","comprehensionScore":0,"attentionScore":0,"reaction":"관중의 한 문장 반응","evidence":"근거가 된 transcript 문장","reason":"그렇게 느낀 이유","blockers":[],"questions":[],"needsExample":false,"improvement":null}]}
-understanding은 followed, partly_lost, lost 중 하나이며 점수는 0에서 100 사이입니다.`;
-  const user = `다음 구간만 근거로 ${persona.name}의 관점에서 분석하세요.\n\n${JSON.stringify(excerpts)}`;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user, maxCompletionTokens: 950 });
-      const parsed = parseJsonContent(raw);
-      const result = sectionModelResponseSchema.safeParse(parsed);
-      if (result.success) return validateKoreanSection(result.data);
-      throw new Error("invalid section response");
-    } catch (error) {
-      if (error instanceof ProviderError) throw error;
-      if (attempt === 1) throw new ProviderError("analysis_invalid_output", "The section analyzer returned invalid analysis data.", { cause: error });
-    }
-  }
-  throw new ProviderError("analysis_invalid_output", "The section analyzer returned invalid analysis data.");
+function sectionExcerpts(structure: StructureSection[], segments: TranscriptSegment[]) {
+  const byId = new Map(segments.map((segment) => [segment.id, segment]));
+  return structure.map((section) => ({
+    sectionId: section.id,
+    title: section.title,
+    startSeconds: section.startSeconds,
+    transcript: section.segmentIds.map((id) => byId.get(id)?.text ?? "").join(" "),
+  }));
 }
 
-async function callSynthesisModel(model: JsonLanguageModelProvider, structure: StructureSection[], analyses: SectionAudienceAnalysis[]): Promise<SynthesisModelResponse | null> {
-  const system = `당신은 발표 분석 통합기입니다. 구간별 관중 분석을 비교해 발표자가 먼저 고칠 한 가지를 찾으세요. 하위 분석에 없는 사실을 추가하지 마세요. 점수보다 관중 차이와 transcript 근거를 우선하세요. ${KOREAN_JSON_RULE}
-아래 JSON 형식만 반환하세요:
-{"headline":"핵심 총평 한 문장","intendedKeyMessage":"발표자가 전달하려 한 핵심 메시지","strengths":["잘 전달된 점"],"discovery":{"kind":"common","title":"가장 큰 발견","detail":"발견 설명","sectionId":"intro","personaIds":["beginner"],"evidence":"근거 문장"}}
-personaIds는 beginner, peer, specialist 중 하나만 사용하세요.`;
-  const user = `발표 구조:\n${JSON.stringify(structure)}\n\n구간별 관중 분석:\n${JSON.stringify(analyses)}`;
+/** One independent, sequential listening pass per persona: no persona sees another's output. */
+async function callSimulationModel(model: JsonLanguageModelProvider, persona: FixedPersona, structure: StructureSection[], segments: TranscriptSegment[]): Promise<SimulationResponse> {
+  const system = `당신은 ${persona.name}의 머릿속을 시뮬레이션하는 관중 시뮬레이션 엔진입니다. 당신은 발표 평가자가 아닙니다. 실제 인간이라고 주장하지 마세요.
+
+${SIMULATION_SYSTEM_RULES}
+
+${personaPrompt(persona.name, PERSONA_MODELS[persona.id])}`;
+  const user = presentationContext(sectionExcerpts(structure, segments));
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user, maxCompletionTokens: 650 });
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system}\n이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user, maxCompletionTokens: 2600 });
+      const result = simulationResponseSchema.safeParse(parseJsonContent(raw));
+      if (!result.success) throw new Error("invalid simulation response");
+      requireKoreanStrings(simulationKoreanStrings(result.data));
+      return result.data;
+    } catch (error) {
+      if (error instanceof ProviderError) throw error;
+      if (attempt === 1) throw new ProviderError("analysis_invalid_output", "The audience simulator returned invalid analysis data.", { cause: error });
+    }
+  }
+  throw new ProviderError("analysis_invalid_output", "The audience simulator returned invalid analysis data.");
+}
+
+const PERSONA_NAMES = Object.fromEntries(FIXED_PERSONAS.map((persona) => [persona.id, persona.name])) as Record<PersonaId, string>;
+
+type SimulationRun = {
+  talkSeconds: number;
+  simulations: PersonaSimulation[];
+  issues: AudienceIssue[];
+};
+
+/** Normalise raw persona passes into speaking order, drop unknown/duplicate sections and calibrate certainty. */
+function buildSimulationRun(structure: StructureSection[], segments: TranscriptSegment[], transcript: string, responses: readonly SimulationResponse[]): SimulationRun {
+  const order = new Map(structure.map((section, index) => [section.id, index]));
+  // Too little speech to know what a listener would have understood: lower confidence one step.
+  const thinEvidence = segments.length < 3 || transcript.replace(/\s+/g, "").length < 80;
+  const simulations = responses.flatMap((response, personaIndex) => {
+    const personaId = FIXED_PERSONAS[personaIndex]!.id;
+    const seen = new Set<string>();
+    return response.sections
+      .filter((section) => order.has(section.sectionId) && !seen.has(section.sectionId) && seen.add(section.sectionId))
+      .sort((a, b) => order.get(a.sectionId)! - order.get(b.sectionId)!)
+      .map((section) => ({ personaId, section: { ...section, likelihood: calibrateLikelihood(section.likelihood, thinEvidence) } }));
+  });
+  const talkSeconds = segments[segments.length - 1]?.endSeconds ?? 0;
+  return { talkSeconds, simulations, issues: selectIssues(structure, simulations, talkSeconds) };
+}
+
+async function callSynthesisModel(model: JsonLanguageModelProvider, structure: StructureSection[], run: SimulationRun): Promise<SynthesisModelResponse | null> {
+  const system = `당신은 발표 분석 통합기입니다. 서로 독립적으로 시뮬레이션된 관중들의 반응 패턴을 비교합니다. 의견을 평균 내거나 "몇 명 중 몇 명이 문제를 발견했다"처럼 머릿수로 요약하지 마세요. 같은 구간에서 관중의 반응이 왜 같거나 달랐는지 원인을 분석하세요. 예: "개념 자체의 난이도보다 그 개념이 왜 필요한지 설명하는 연결이 부족해서, 전문가는 기존 지식으로 보완했지만 비전공 관중은 연결을 스스로 만들기 어려웠을 가능성이 있다."
+하위 시뮬레이션에 없는 사실을 추가하지 마세요. 시뮬레이션 결과를 사실처럼 단정하지 말고 "가능성이 높아요/있어요"처럼 표현하세요. 점수나 평가 등급을 만들지 마세요. 주요 문제는 이미 중요도 순으로 골라져 있으니 새로 추가하거나 빼지 마세요. ${KOREAN_JSON_RULE}
+아래 JSON 형식만 반환하세요:
+{"headline":"관중들이 발표를 어떻게 경험했는지 한 문장","intendedKeyMessage":"발표자가 전달하려 한 핵심 메시지","strengths":["관중에게 잘 전달된 점"],"discovery":{"kind":"common","title":"가장 큰 발견","detail":"원인 중심 설명","sectionId":"intro","personaIds":["beginner"],"evidence":"근거 문장"},"issues":[{"sectionId":"intro","why":"왜 이 문제가 생겼는가","pattern":"관중마다 반응이 같거나 달랐던 원인"}]}
+personaIds는 beginner, peer, specialist만 사용하세요. issues에는 주어진 주요 문제의 sectionId만 순서대로 쓰세요.`;
+  const view = (item: PersonaSimulation) => ({
+    personaId: item.personaId,
+    reaction: item.section.reaction,
+    understanding: item.section.understanding,
+    agreement: item.section.agreement,
+    cause: item.section.cause,
+    stateBefore: item.section.stateBefore,
+    stateAfter: item.section.stateAfter,
+    evidence: item.section.evidence,
+    likelihood: item.section.likelihood,
+  });
+  const majorIssues = run.issues.map((issue) => ({
+    sectionId: issue.section.id,
+    title: issue.section.title,
+    timestamp: formatTimestamp(issue.section.startSeconds),
+    salience: issue.level,
+    listeners: issue.all.map(view),
+  }));
+  const journey = run.simulations
+    .filter((item) => item.section.reaction !== "NO_SIGNIFICANT_CHANGE")
+    .map((item) => ({ sectionId: item.section.sectionId, ...view(item) }));
+  const user = `발표 구조:\n${JSON.stringify(structure.map(({ id, title, summary }) => ({ id, title, summary })))}\n\n주요 문제(중요도 순):\n${JSON.stringify(majorIssues)}\n\n의미 있는 반응 변화:\n${JSON.stringify(journey)}`;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const raw = await model.completeJson({ system: attempt === 0 ? system : `${system} 이전 응답이 잘못되었습니다. 정확한 JSON만 반환하세요.`, user, maxCompletionTokens: 1100 });
       const parsed = parseJsonContent(raw);
       const synthesis = synthesisModelResponseSchema.safeParse(parsed);
       if (synthesis.success) return validateKoreanSynthesis(synthesis.data);
@@ -372,93 +418,138 @@ personaIds는 beginner, peer, specialist 중 하나만 사용하세요.`;
   throw new ProviderError("analysis_invalid_output", "The cross-check analyzer returned invalid analysis data.");
 }
 
-function discoveryFallback(structure: StructureSection[], analyses: SectionAudienceAnalysis[]): AnalysisDiscovery {
-  const bySection = structure.map((section) => ({ section, items: analyses.filter((analysis) => analysis.sectionId === section.id) }));
-  const common = bySection.find(({ items }) => items.filter((item) => item.understanding !== "followed" || item.needsExample).length >= 2);
-  if (common) {
-    const items = common.items.filter((item) => item.understanding !== "followed" || item.needsExample);
-    return analysisDiscoverySchema.parse({
-      kind: "common",
-      title: "여러 관중이 같은 구간에서 멈췄어요",
-      detail: `${items.length}명의 관중이 ${common.section.title}에서 추가 설명이 필요하다고 판단했습니다.`,
-      sectionId: common.section.id,
-      personaIds: items.map((item) => item.personaId),
-      evidence: items[0]?.evidence,
-    });
+function discoveryFromIssues(issues: AudienceIssue[]): AnalysisDiscovery {
+  const top = issues[0];
+  if (!top) {
+    return analysisDiscoverySchema.parse({ kind: "common", title: "핵심 흐름은 대체로 전달됐어요", detail: "관중마다 따로 들어 봤지만, 이해나 집중이 크게 흔들린 구간은 발견되지 않았어요.", personaIds: [] });
   }
-  const split = bySection.find(({ items }) => {
-    const states = new Set(items.map((item) => item.understanding));
-    return states.size > 1;
+  const everyone = top.affected.length === top.all.length && top.all.length > 1;
+  return analysisDiscoverySchema.parse({
+    kind: everyone ? "common" : "split",
+    title: everyone ? "여러 관중이 같은 구간에서 멈췄어요" : "관중마다 받아들인 정도가 달랐어요",
+    detail: patternFallback(top, PERSONA_NAMES),
+    sectionId: top.section.id,
+    personaIds: top.affected.map((item) => item.personaId),
+    evidence: top.affected[0]?.section.evidence,
   });
-  if (split) {
-    return analysisDiscoverySchema.parse({
-      kind: "split",
-      title: "관중의 반응이 갈린 구간이 있어요",
-      detail: `${split.section.title}은 배경지식에 따라 이해도가 달라졌습니다.`,
-      sectionId: split.section.id,
-      personaIds: split.items.map((item) => item.personaId),
-      evidence: split.items.find((item) => item.evidence)?.evidence,
-    });
-  }
-  return analysisDiscoverySchema.parse({ kind: "common", title: "핵심 흐름은 대체로 전달됐어요", detail: "관중별 반응을 비교했지만 한 구간에 집중된 큰 차이는 발견되지 않았습니다.", personaIds: [] });
 }
 
+const EXPLANATION_CAUSES = new Set<ConfusionType>(["TERM_CONFUSION", "CONCEPT_CONFUSION", "CONTEXT_GAP", "PURPOSE_CONFUSION", "REFERENCE_GAP"]);
+
 function deepProviderResult(
-  presentation: Pick<StoredPresentation, "id" | "title" | "durationSeconds">,
   transcript: string,
   segments: TranscriptSegment[],
   structure: StructureSection[],
-  responses: readonly SectionModelResponse[],
+  responses: readonly SimulationResponse[],
+  run: SimulationRun,
   synthesis: SynthesisModelResponse | null,
 ): AnalysisResult {
+  const { simulations, issues } = run;
   const knownSectionIds = new Set(structure.map((section) => section.id));
-  const sectionAnalyses = responses.flatMap((response, personaIndex) => response.sections.flatMap((section) => {
-    const personaId = FIXED_PERSONAS[personaIndex]!.id;
-    if (!knownSectionIds.has(section.sectionId)) return [];
-    const parsed = sectionAudienceAnalysisSchema.safeParse({ ...section, personaId });
+  const sectionAnalyses = simulations.flatMap(({ personaId, section }) => {
+    const issue = isIssue(section);
+    const parsed = sectionAudienceAnalysisSchema.safeParse({
+      sectionId: section.sectionId,
+      personaId,
+      understanding: section.understanding,
+      ...internalScores(section),
+      reaction: section.naturalReaction,
+      evidence: section.evidence,
+      reason: section.stateAfter,
+      blockers: issue ? [section.stateAfter] : [],
+      questions: section.question && section.salience.natural ? [section.question] : [],
+      needsExample: issue && (section.cause === "EXAMPLE_GAP" || section.mentalModelGap !== null),
+      improvement: issue && section.improvement ? { title: section.improvement.title, problem: section.stateAfter, action: section.improvement.action, example: section.improvement.example } : null,
+      simulation: {
+        stateBefore: section.stateBefore,
+        newInformation: section.newInformation,
+        stateAfter: section.stateAfter,
+        reactionType: section.reaction,
+        agreement: section.agreement,
+        cause: section.cause,
+        likelihood: section.likelihood,
+        salience: salienceLevel(section),
+        mentalModelGap: section.mentalModelGap,
+        recovery: section.recovery,
+      },
+    });
     return parsed.success ? [parsed.data] : [];
-  }));
-  const discovery = synthesis?.discovery ?? discoveryFallback(structure, sectionAnalyses);
+  });
+
+  const synthesisIssues = new Map((synthesis?.issues ?? []).map((issue) => [issue.sectionId, issue]));
+  const difficultSections = issues.map((issue) => {
+    const lead = issue.affected[0]!.section;
+    const explained = synthesisIssues.get(issue.section.id);
+    return {
+      segmentId: issue.section.segmentIds[0]!,
+      sectionId: issue.section.id,
+      reason: explained?.why ?? `${issue.cause ? `${CONFUSION_LABEL[issue.cause]}: ` : ""}${lead.stateAfter}`,
+      personaIds: issue.affected.map((item) => item.personaId),
+      cause: issue.cause,
+      likelihood: issue.likelihood,
+      salience: issue.level,
+      pattern: explained?.pattern ?? patternFallback(issue, PERSONA_NAMES),
+      evidence: lead.evidence,
+    };
+  });
+
+  const improvements = issues.flatMap((issue) => {
+    const source = issue.affected.find((item) => item.section.improvement)?.section;
+    if (!source?.improvement) return [];
+    return [{ id: `deep-improvement-${issue.section.id}`, title: source.improvement.title, problem: source.stateAfter, action: source.improvement.action, example: source.improvement.example, sourceSegmentIds: issue.section.segmentIds }];
+  });
+
+  const explanationGaps = issues.flatMap((issue) => {
+    if (!issue.cause || !EXPLANATION_CAUSES.has(issue.cause)) return [];
+    const lead = issue.affected.find((item) => item.section.cause === issue.cause)!.section;
+    return [{
+      term: lead.newInformation,
+      why: lead.stateAfter,
+      suggestion: lead.improvement?.action ?? lead.recovery ?? "처음 나올 때 이 내용이 어떤 역할을 하는지 한 문장으로 먼저 설명해 주세요.",
+      sectionId: issue.section.id,
+      segmentId: issue.section.segmentIds[0]!,
+      personaIds: issue.affected.map((item) => item.personaId),
+    }];
+  });
+
+  // Analogy suggestions only where the listener passed the four-condition check and the gap mattered.
+  const mentalModelGaps = issues.flatMap((issue) => {
+    const withGap = issue.affected.filter((item) => item.section.mentalModelGap);
+    const gap = withGap[0]?.section.mentalModelGap;
+    if (!gap) return [];
+    return [{ ...gap, sectionId: issue.section.id, segmentId: issue.section.segmentIds[0]!, personaIds: withGap.map((item) => item.personaId) }];
+  });
+
+  const questions = naturalQuestions(structure, simulations);
   const personas = FIXED_PERSONAS.map((persona, index) => {
-    const response = responses[index]!;
-    const items = response.sections;
-    const blockers = uniqueStrings(items.flatMap((item) => item.blockers));
-    const questions = uniqueStrings(items.flatMap((item) => item.questions));
+    const own = simulations.filter((item) => item.personaId === persona.id).map((item) => item.section);
+    const scores = own.map(internalScores);
+    const average = (key: "comprehensionScore" | "attentionScore") => Math.round(scores.reduce((sum, item) => sum + item[key], 0) / Math.max(scores.length, 1));
     return {
       id: persona.id,
       name: persona.name,
       perspective: persona.perspective,
-      comprehensionScore: Math.round(items.reduce((sum, item) => sum + item.comprehensionScore, 0) / Math.max(items.length, 1)),
-      attentionScore: Math.round(items.reduce((sum, item) => sum + item.attentionScore, 0) / Math.max(items.length, 1)),
-      reaction: response.overallReaction,
-      blockers,
-      questions,
+      comprehensionScore: scores.length ? average("comprehensionScore") : 75,
+      attentionScore: scores.length ? average("attentionScore") : 75,
+      reaction: responses[index]!.overallExperience,
+      blockers: uniqueStrings(own.filter(isIssue).map((section) => section.stateAfter)),
+      questions: questions.filter((question) => question.personaIds.includes(persona.id)).map((question) => question.question),
     };
   });
-  const difficultSections = structure.flatMap((section) => {
-    const items = sectionAnalyses.filter((analysis) => analysis.sectionId === section.id);
-    const focus = items.filter((item) => item.understanding !== "followed" || item.needsExample);
-    if (focus.length === 0) return [];
-    const reactions = focus.map((item) => ({ personaId: `p-${item.personaId}`, reaction: item.reaction }));
-    const suggestion = focus.find((item) => item.improvement)?.improvement;
-    return [{
-      segmentId: section.segmentIds[0]!,
-      reason: focus[0]!.reason,
-      __frontend: { section, reactions, suggestion },
-    }];
-  });
-  const improvements = structure.flatMap((section) => {
-    const item = sectionAnalyses.find((analysis) => analysis.sectionId === section.id && analysis.improvement);
-    if (!item?.improvement) return [];
-    return [{ id: `deep-improvement-${section.id}`, ...item.improvement, sourceSegmentIds: section.segmentIds }];
-  });
+
+  const synthesisDiscovery = synthesis?.discovery && (!synthesis.discovery.sectionId || knownSectionIds.has(synthesis.discovery.sectionId)) ? synthesis.discovery : null;
+  const discovery = synthesisDiscovery ?? discoveryFromIssues(issues);
+  const top = issues[0];
+  const overview = synthesis?.headline
+    ?? (top
+      ? `${top.section.title}에서 ${top.affected.map((item) => PERSONA_NAMES[item.personaId]).join(", ")}의 이해 연결이 약해졌을 가능성이 있어요.`
+      : "관중 모두 발표의 흐름을 크게 놓치지 않았을 가능성이 높아요.");
   const comprehensionScore = Math.round(personas.reduce((sum, persona) => sum + persona.comprehensionScore, 0) / personas.length);
   const attentionScore = Math.round(personas.reduce((sum, persona) => sum + persona.attentionScore, 0) / personas.length);
-  const overview = synthesis?.headline ?? discovery.detail;
   return analysisResultSchema.parse({
     version: "1.0",
     mode: "provider",
-    disclaimer: "Generated from this transcript by the configured STT/LLM provider; feedback is informational.",
+    disclaimer: "Generated from this transcript by the configured STT/LLM provider as a simulated audience; feedback is informational.",
     generatedAt: new Date().toISOString(),
     summary: {
       overview,
@@ -470,12 +561,16 @@ function deepProviderResult(
     },
     transcript: { text: transcript, segments },
     personas,
-    difficultSections: difficultSections.map(({ segmentId, reason }) => ({ segmentId, reason })),
-    missingExplanations: uniqueStrings(sectionAnalyses.flatMap((analysis) => analysis.blockers)).slice(0, 12),
+    difficultSections,
+    missingExplanations: explanationGaps.map((gap) => gap.term),
     improvements,
     structure: { sections: structure },
     sectionAnalyses,
     discovery,
+    keyMoments: keyMoments(structure, simulations, PERSONA_NAMES),
+    naturalQuestions: questions,
+    explanationGaps,
+    mentalModelGaps,
   });
 }
 
@@ -534,40 +629,37 @@ export class ProviderPresentationAnalysisProvider implements PresentationAnalysi
       message: "발표를 분석할 핵심 구간으로 나누고 있어요.",
       pipeline: pipelineSnapshot(structure, structure[0]?.id ?? null, null, "section"),
     });
-    const responses: SectionModelResponse[] = [];
+    const responses: SimulationResponse[] = [];
+    const insights: AnalysisPipelineSnapshot["insights"] = [];
     for (const persona of FIXED_PERSONAS) {
       const completedPersonaIds = responses.map((_, index) => FIXED_PERSONAS[index]!.id);
       onStage?.("evaluating", {
         phase: "persona",
         personaId: persona.id,
-        message: `${persona.name}이 발표의 각 구간을 차례로 듣고 있어요.`,
-        pipeline: pipelineSnapshot(
-          structure,
-          null,
-          persona.id,
-          "persona",
-          personaCells(structure, completedPersonaIds, persona.id),
-        ),
+        message: `${persona.name}이 발표를 처음부터 순서대로 들으며 이해가 어떻게 바뀌는지 따라가고 있어요.`,
+        pipeline: pipelineSnapshot(structure, null, persona.id, "persona", personaCells(structure, completedPersonaIds, persona.id), [...insights]),
       });
-      responses.push(await callSectionPersonaModel(this.languageModel, persona, structure, segments));
+      const response = await callSimulationModel(this.languageModel, persona, structure, segments);
+      responses.push(response);
+      // Surface only a salient change this listener actually had, never a guess.
+      const firstIssue = response.sections.find((section) => structure.some((s) => s.id === section.sectionId) && isIssue(section));
+      if (firstIssue) {
+        insights.push({ id: `insight-${persona.id}`, text: firstIssue.naturalReaction, sectionId: firstIssue.sectionId, personaId: `p-${persona.id}` });
+      }
     }
-    const knownSectionIds = new Set(structure.map((section) => section.id));
-    const sectionAnalyses = responses.flatMap((response, personaIndex) => response.sections.flatMap((section) => {
-      const parsed = sectionAudienceAnalysisSchema.safeParse({ ...section, personaId: FIXED_PERSONAS[personaIndex]!.id });
-      return parsed.success && knownSectionIds.has(section.sectionId) ? [parsed.data] : [];
-    }));
+    const run = buildSimulationRun(structure, segments, transcript, responses);
     onStage?.("cross_check", {
       phase: "cross_check",
-      message: "관중들의 공통 반응과 의견 차이를 교차 검증하고 있어요.",
-      pipeline: pipelineSnapshot(structure, null, null, "cross_check", personaCells(structure, FIXED_PERSONAS.map((persona) => persona.id), null)),
+      message: "관중마다 반응이 같거나 달랐던 원인을 비교하고, 실제로 중요한 문제만 추리고 있어요.",
+      pipeline: pipelineSnapshot(structure, null, null, "cross_check", personaCells(structure, FIXED_PERSONAS.map((persona) => persona.id), null), [...insights]),
     });
-    const synthesis = await callSynthesisModel(this.languageModel, structure, sectionAnalyses);
+    const synthesis = await callSynthesisModel(this.languageModel, structure, run);
     onStage?.("finalizing", {
       phase: "synthesis",
-      message: "발표자가 먼저 고칠 인사이트를 정리하고 있어요.",
-      pipeline: pipelineSnapshot(structure, null, null, null, personaCells(structure, FIXED_PERSONAS.map((persona) => persona.id), null)),
+      message: "발표자가 먼저 고칠 핵심 문제를 정리하고 있어요.",
+      pipeline: pipelineSnapshot(structure, null, null, null, personaCells(structure, FIXED_PERSONAS.map((persona) => persona.id), null), [...insights]),
     });
-    return deepProviderResult(presentation, transcript, segments, structure, responses, synthesis);
+    return deepProviderResult(transcript, segments, structure, responses, run, synthesis);
   }
 }
 
@@ -617,7 +709,7 @@ export async function runAnalysis(id: string, provider?: PresentationAnalysisPro
           currentSectionId: context?.sectionId ?? null,
           currentPersonaId: context?.personaId ?? null,
           message: context?.message ?? null,
-          pipeline: context?.pipeline,
+          pipeline: context?.pipeline ? { ...context.pipeline, message: context.message } : context?.pipeline,
         });
       },
     });

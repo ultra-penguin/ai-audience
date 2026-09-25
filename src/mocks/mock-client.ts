@@ -15,7 +15,8 @@ import { SAMPLE_RESULT, SAMPLE_RESULT_LEGACY, SAMPLE_RESULT_NO_ISSUES } from "./
  *
  * Status is derived from the time analysis started, so a page reload keeps
  * progressing (the start time is also encoded in generated ids). Reserved ids:
- *   - "sample"      completed sample result
+ *   - "demo-script"  timed sample analysis for the recording-screen shortcut
+ *   - "sample"       completed sample result
  *   - "demo-empty"  completed, no difficult sections (empty state)
  *   - "demo-failed" analysis fails once; retry succeeds
  *   - "demo-legacy" Phase 3 status/result shape without pipeline detail
@@ -49,7 +50,7 @@ type MockRecord = {
 };
 
 const records = new Map<string, MockRecord>();
-const RESERVED = new Set(["sample", "demo-empty", "demo-failed", "demo-legacy"]);
+const RESERVED = new Set(["sample", "demo-script", "demo-empty", "demo-failed", "demo-legacy"]);
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const now = () => Date.now();
@@ -63,7 +64,7 @@ function timestampFromId(id: string): number | undefined {
 }
 
 function assertKnown(id: string) {
-  if (!RESERVED.has(id) && !records.has(id) && timestampFromId(id) === undefined) {
+  if (!RESERVED.has(id) && !id.startsWith("demo-script-") && !records.has(id) && timestampFromId(id) === undefined) {
     throw new ApiError("not_found", "해당 발표를 찾을 수 없어요.", 404);
   }
 }
