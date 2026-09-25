@@ -4,6 +4,62 @@ Run date: 2026-09-26 (Asia/Seoul)
 Commit: `0196b125c33d846a4e50953e3526e6aebf861129` (`PM1` baseline)  
 Worktree: `landing-qa`
 
+## Integrated QA
+
+Run date: 2026-09-26 (Asia/Seoul)
+Commit under test: `16ea235` (`merge: landing motion fix round 1 (Worker B)`)
+Server: `pnpm exec next dev -p 3110 --hostname 127.0.0.1`
+Runner: `node docs/qa/landing-qa.mjs http://127.0.0.1:3110 /tmp/landing-qa-integrated`
+
+The requested gates were run in order. Typecheck, lint, unit tests, and build all passed; Vitest reported 12 files and 51 tests passed (the two expected malformed-provider `analysis_failed` stderr lines remain). The browser runner covered `1920x1080`, `1440x900`, `1280x800`, and `375x812`, waited 3.1 seconds after scrolling to the bottom and back before each full-page screenshot, and produced 96 checks: 88 passed and 8 failed.
+
+### Static gates
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| `pnpm typecheck` | PASS | `tsc --noEmit` exit 0 |
+| `pnpm lint` | PASS | ESLint exit 0 |
+| `pnpm test` | PASS | 12 files, 51 tests passed |
+| `pnpm build` | PASS | Next.js 16.3.5 production build completed; routes generated |
+
+### Browser PASS/FAIL table
+
+| Check | 1920×1080 | 1440×900 | 1280×800 | 375×812 |
+| --- | --- | --- | --- | --- |
+| Landing HTTP status | PASS (200) | PASS (200) | PASS (200) | PASS (200) |
+| Console/hydration/page errors | PASS | PASS | PASS | PASS |
+| Load long tasks ≤ 200ms | PASS (none observed) | PASS (none observed) | PASS (none observed) | PASS (none observed) |
+| Load CLS ≤ 0.1 | PASS (0.000) | PASS (0.000) | PASS (0.000) | PASS (0.000) |
+| Animations transform/opacity only | **FAIL** (`draw:stroke-dashoffset`) | **FAIL** | **FAIL** | **FAIL** |
+| No horizontal overflow | PASS | PASS | PASS | PASS |
+| Ten section heading IDs in order | PASS | PASS | PASS | PASS |
+| Hero H1 + CTA in first viewport | PASS | PASS | PASS | PASS |
+| CTA links point to `/record` | PASS | PASS | PASS | PASS |
+| Visible text `DEMO` | PASS | PASS | PASS | PASS |
+| Research source links | PASS (3) | PASS (3) | PASS (3) | PASS (3) |
+| Persona tabs + panel + arrow keys | PASS (3 tabs) | PASS (3 tabs) | PASS (3 tabs) | PASS (3 tabs) |
+| AnalysisTimeline points | PASS (4) | PASS (4) | PASS (4) | PASS (4) |
+| Exactly one H1 | PASS | PASS | PASS | PASS |
+| Landmark `main` | PASS | PASS | PASS | PASS |
+| Images/SVGs labeled or hidden | **FAIL** (one unlabeled SVG) | **FAIL** | **FAIL** | **FAIL** |
+| Focus visible on tabs/buttons | PASS (7 targets) | PASS (7 targets) | PASS (7 targets) | PASS (7 targets) |
+| Color not sole state signal | PASS (7 semantic states) | PASS | PASS | PASS |
+| Document height | PASS (7,593px ≤ 8,600px) | PASS (7,304px) | PASS (7,204px) | PASS (10,706px) |
+| Reduced-motion console/page errors | PASS | PASS | PASS | PASS |
+| Reduced-motion research metrics | PASS | PASS | PASS | PASS |
+| Reduced-motion perspective statement | PASS | PASS | PASS | PASS |
+| `/record` regression load | PASS | PASS | PASS | PASS |
+| `/result/sample` regression load | PASS | PASS | PASS | PASS |
+| `/result/demo-legacy` regression load | PASS | PASS | PASS | PASS |
+| `/analyzing/demo-script` regression load | PASS | PASS | PASS | PASS |
+
+### Remaining issues
+
+1. **Animation property violation (all viewports):** `src/components/landing/hero-visual.tsx` uses the `draw` keyframe, which animates SVG `stroke-dashoffset`; the performance sanity check requires animations to be limited to `transform`/`opacity`. This is motion/design-owned and was not rewritten. Proposed fix: Worker B replace the stroke-dashoffset reveal with a transform/opacity compositor-safe treatment, or explicitly document this SVG exception if the visual is intentional.
+2. **Decorative SVG accessibility (all viewports):** the connector SVG in `src/components/landing/persona-simulation.tsx` has no `aria-hidden="true"`, `role="img"`, or accessible label. This is landing UI-owned and was not rewritten. Proposed fix: Worker A mark the connector `aria-hidden="true"` because the adjacent tab controls carry its meaning (or provide a meaningful label if it is intended to be exposed).
+
+No other issues were found. The development server was stopped after the browser run.
+
 ## Baseline gates
 
 | Gate | Result | Notes |

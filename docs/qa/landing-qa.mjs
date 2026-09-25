@@ -56,26 +56,146 @@ function viewportName(viewport) {
 }
 
 function attachDiagnostics(page) {
-  const diagnostics = { consoleErrors: [], pageErrors: [] };
+  const diagnostics = { consoleErrors: [], hydrationErrors: [], pageErrors: [] };
   page.on("console", (message) => {
-    if (message.type() === "error") diagnostics.consoleErrors.push(message.text());
+    const text = message.text();
+    if (message.type() === "error") diagnostics.consoleErrors.push(text);
+    if (/hydration|server html|client html|hydrated/i.test(text)) diagnostics.hydrationErrors.push(text);
   });
   page.on("pageerror", (error) => diagnostics.pageErrors.push(error.message));
   return diagnostics;
 }
 
+async function installInstrumentation(context) {
+  await context.addInitScript(() => {
+    const state = { longTasks: [], layoutShifts: [], longTaskSupported: false, layoutShiftSupported: false };
+    globalThis.__landingPerf = state;
+    if (typeof PerformanceObserver === "undefined") return;
+    const supported = PerformanceObserver.supportedEntryTypes ?? [];
+    if (supported.includes("longtask")) {
+      state.longTaskSupported = true;
+      try {
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) state.longTasks.push(entry.duration);
+        }).observe({ type: "longtask", buffered: true });
+      } catch {
+        state.longTaskSupported = false;
+      }
+    }
+    if (supported.includes("layout-shift")) {
+      state.layoutShiftSupported = true;
+      try {
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (!entry.hadRecentInput) state.layoutShifts.push(entry.value);
+          }
+        }).observe({ type: "layout-shift", buffered: true });
+      } catch {
+        state.layoutShiftSupported = false;
+      }
+    }
+  });
+}
+
 async function gotoPage(page, url) {
   const response = await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("load").catch(() => {});
+  await page.waitForTimeout(100);
   return response;
 }
 
 async function pageDiagnostics(page, diagnostics, url) {
   const response = await gotoPage(page, url);
+  const performance = await page.evaluate(() => globalThis.__landingPerf ?? null).catch(() => null);
   return {
     status: response?.status() ?? 0,
-    errors: [...diagnostics.consoleErrors, ...diagnostics.pageErrors],
+    errors: [...diagnostics.consoleErrors, ...diagnostics.hydrationErrors, ...diagnostics.pageErrors],
+    performance,
   };
+}
+
+async function performanceChecks(page, pageResult, viewport) {
+  const name = viewportName(viewport);
+  await runCheck(name, "load long tasks <= 200ms", () => {
+    const durations = pageResult.performance?.longTasks ?? [];
+    const supported = pageResult.performance?.longTaskSupported;
+    return {
+      pass: !supported || durations.every((duration) => duration <= 200),
+      detail: supported ? (durations.length ? `max=${Math.max(...durations).toFixed(1)}ms` : "none observed") : "PerformanceObserver longtask unavailable",
+    };
+  });
+  await runCheck(name, "load CLS <= 0.1", () => {
+    const shifts = pageResult.performance?.layoutShifts ?? [];
+    const supported = pageResult.performance?.layoutShiftSupported;
+    const cls = shifts.reduce((sum, value) => sum + value, 0);
+    return {
+      pass: !supported || cls <= 0.1,
+      detail: supported ? `CLS=${cls.toFixed(3)}` : "PerformanceObserver layout-shift unavailable",
+    };
+  });
+  await runCheck(name, "animations use transform/opacity only", async () => {
+    const result = await page.evaluate(() => {
+      const bad = [];
+      const visit = (rules) => {
+        for (const rule of rules) {
+          if (rule.type === CSSRule.KEYFRAMES_RULE) {
+            for (const keyframe of rule.cssRules) {
+              for (const property of keyframe.style) {
+                if (!["transform", "opacity"].includes(property) && !property.startsWith("--tw-")) {
+                  bad.push(`${rule.name}:${property}`);
+                }
+              }
+            }
+          } else if (rule.cssRules) {
+            visit(rule.cssRules);
+          }
+        }
+      };
+      for (const sheet of document.styleSheets) {
+        try {
+          if (sheet.cssRules) visit(sheet.cssRules);
+        } catch {
+          // Ignore cross-origin stylesheets; the app's local stylesheet remains inspectable.
+        }
+      }
+      return [...new Set(bad)];
+    });
+    return { pass: result.length === 0, detail: result.length ? result.join(", ") : "all keyframes limited to transform/opacity" };
+  });
+}
+
+async function accessibilityChecks(page, viewport) {
+  const name = viewportName(viewport);
+  await runCheck(name, "one h1", async () => ({ pass: await page.locator("h1").count() === 1, detail: `count=${await page.locator("h1").count()}` }));
+  await runCheck(name, "main landmark", async () => ({ pass: await page.locator("main").count() === 1, detail: `count=${await page.locator("main").count()}` }));
+  await runCheck(name, "images and SVGs labeled or hidden", async () => {
+    const result = await page.evaluate(() => [...document.querySelectorAll("img, svg")].map((node) => ({
+      tag: node.tagName.toLowerCase(),
+      label: node.getAttribute("aria-label") || node.getAttribute("aria-labelledby") || node.getAttribute("alt"),
+      hidden: node.getAttribute("aria-hidden") === "true",
+    })).filter((node) => !node.hidden && !node.label));
+    return { pass: result.length === 0, detail: result.length ? result.map((node) => node.tag).join(", ") : "all labeled or aria-hidden" };
+  });
+  await page.keyboard.press("Tab").catch(() => {});
+  await runCheck(name, "focus visible on tabs/buttons", async () => {
+    const result = await page.evaluate(() => {
+      const targets = [...document.querySelectorAll("button, [role=tab]")];
+      const misses = targets.filter((node) => {
+        node.focus();
+        const style = getComputedStyle(node);
+        return !node.matches(":focus-visible") || (style.outlineStyle === "none" && style.boxShadow === "none");
+      });
+      return { count: targets.length, misses: misses.map((node) => node.textContent?.trim().slice(0, 30) || node.tagName) };
+    });
+    return { pass: result.count > 0 && result.misses.length === 0, detail: `targets=${result.count}${result.misses.length ? ` misses=${result.misses.join(", ")}` : ""}` };
+  });
+  await runCheck(name, "color is not the sole state signal", async () => {
+    const result = await page.evaluate(() => [...document.querySelectorAll("[role=tab][aria-selected], button[aria-pressed]")].map((node) => ({
+      text: node.textContent?.trim(),
+      state: node.getAttribute("aria-selected") ?? node.getAttribute("aria-pressed"),
+    })));
+    return { pass: result.length > 0 && result.every((item) => item.text && item.state !== null), detail: `semantic states=${result.length}` };
+  });
 }
 
 async function checkLanding(page, diagnostics, viewport) {
@@ -86,6 +206,7 @@ async function checkLanding(page, diagnostics, viewport) {
     pass: pageResult.errors.length === 0,
     detail: pageResult.errors.join(" | "),
   }));
+  await performanceChecks(page, pageResult, viewport);
 
   await runCheck(name, "no horizontal overflow", async () => {
     const metrics = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
@@ -162,12 +283,25 @@ async function checkLanding(page, diagnostics, viewport) {
     return { pass: selected === count && textWithSummary === count, detail: `points=${count}, selected=${selected}, summaries=${textWithSummary}` };
   });
 
+  await accessibilityChecks(page, viewport);
+  await page.evaluate(() => {
+    const bottom = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0);
+    window.scrollTo(0, bottom);
+    window.scrollTo(0, 0);
+  });
+  await page.waitForTimeout(3100);
+  await runCheck(name, "document height budget", async () => {
+    const height = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0));
+    const budget = viewport.width === 1920 ? 8600 : null;
+    return { pass: budget === null || height <= budget, detail: `${height}px${budget ? ` <= ${budget}px` : ""}` };
+  });
   await page.screenshot({ path: `${SCREENSHOT_DIR}/landing-${name}.png`, fullPage: true });
 }
 
 async function checkReducedMotion(browser, viewport) {
   const name = viewportName(viewport);
   const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
+  await installInstrumentation(context);
   const page = await context.newPage();
   const diagnostics = attachDiagnostics(page);
   try {
@@ -188,8 +322,9 @@ async function checkReducedMotion(browser, viewport) {
 
 async function checkRoutes(browser, viewport) {
   const name = viewportName(viewport);
-  for (const path of ["/result/sample", "/record"]) {
+  for (const path of ["/record", "/result/sample", "/result/demo-legacy", "/analyzing/demo-script"]) {
     const context = await browser.newContext({ viewport });
+    await installInstrumentation(context);
     const page = await context.newPage();
     const diagnostics = attachDiagnostics(page);
     try {
@@ -207,6 +342,7 @@ const browser = await chromium.launch({ executablePath: EXECUTABLE_PATH, headles
 try {
   for (const viewport of VIEWPORTS) {
     const context = await browser.newContext({ viewport });
+    await installInstrumentation(context);
     const page = await context.newPage();
     const diagnostics = attachDiagnostics(page);
     try {
