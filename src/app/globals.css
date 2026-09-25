@@ -164,6 +164,8 @@
   --animate-rise-in: rise-in 220ms var(--ease-out) both;
   --animate-draw: draw 700ms var(--ease-out) both;
   --animate-settle: settle 420ms var(--ease-out) both;
+  /* Hero voice: a few beats while the sequence plays, then rests at its natural shape. */
+  --animate-speak: speak 900ms ease-in-out 3;
 
   @keyframes listen {
     0%,
@@ -194,6 +196,16 @@
       transform: scale(1);
     }
   }
+  /* Starts and ends at the bar's real height so the rest state never jumps. */
+  @keyframes speak {
+    0%,
+    100% {
+      transform: scaleY(1);
+    }
+    50% {
+      transform: scaleY(0.4);
+    }
+  }
   @keyframes rise-in {
     from {
       opacity: 0;
@@ -202,6 +214,19 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+}
+
+/*
+ * `motion-js:` — styles for "before it animates" states. They apply only when
+ * scripts run AND the visitor allows motion, so no-JS and reduced-motion
+ * visitors always get the final, complete composition straight from the server.
+ */
+@custom-variant motion-js {
+  @media (scripting: enabled) {
+    @media (prefers-reduced-motion: no-preference) {
+      @slot;
     }
   }
 }
