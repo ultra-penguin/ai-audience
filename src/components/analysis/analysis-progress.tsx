@@ -15,7 +15,6 @@ import {
 } from "@/features/analysis/pipeline";
 import { AudienceSeats } from "@/components/audience/audience-seats";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { PersonaChip } from "@/components/ui/persona-chip";
 import { Spinner } from "@/components/ui/spinner";
@@ -102,7 +101,7 @@ export function AnalysisProgress({ id }: { id: string }) {
         <p className="text-body-md text-on-surface-variant">{captionFor(status.data)}</p>
       </section>
 
-      <Card className="p-5 sm:p-8">
+      <section className="border-y border-outline-variant/60 py-6 sm:py-8">
         <p role="status" aria-live="polite" className="sr-only">
           {status.isPending
             ? "분석 상태를 확인하고 있어요."
@@ -157,7 +156,7 @@ export function AnalysisProgress({ id }: { id: string }) {
             </Link>
           </div>
         )}
-      </Card>
+      </section>
 
       {detailed && status.data && <NowListening status={status.data} />}
       {detailed && <StructureProgress status={status.data!} />}
@@ -223,7 +222,7 @@ function NowListening({ status }: { status: AnalysisStatus }) {
   if (!section && !persona) return null;
 
   return (
-    <section aria-labelledby="now-title" className="space-y-3 rounded-xl bg-surface-container-low p-5">
+    <section aria-labelledby="now-title" className="space-y-3 border-l-2 border-primary pl-5">
       <h2 id="now-title" className="text-label-md text-on-surface-variant">
         지금 보고 있는 곳
       </h2>
@@ -240,10 +239,11 @@ function NowListening({ status }: { status: AnalysisStatus }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 md:px-8 md:py-14">
-      <div className="space-y-2">
-        <h1 className="text-headline-xl-mobile md:text-headline-xl text-on-surface">관중 리뷰를 준비하고 있어요</h1>
-        <p className="text-body-lg text-on-surface-variant">비전공·일반·전문가 관중이 같은 발표를 각자의 시선으로 듣고, 막히는 곳을 찾아요.</p>
+    <div className="mx-auto max-w-7xl space-y-10 px-4 py-12 sm:px-6 md:py-16 lg:px-10">
+      <div className="max-w-3xl space-y-3">
+        <p className="text-label-md text-primary">AI 관중 시뮬레이션</p>
+        <h1 className="text-[2.75rem] font-semibold leading-[1.06] tracking-[-0.04em] text-on-surface sm:text-[4rem]">발표를 읽고 있어요.</h1>
+        <p className="max-w-2xl text-body-lg text-on-surface-variant">비전공·일반·전문가 관중이 같은 발표를 각자의 시선으로 듣고, 막히는 곳을 찾는 중입니다.</p>
       </div>
       {children}
     </div>

@@ -32,15 +32,15 @@ function Seat({ seat, state, index }: { seat: AudienceSeat; state?: SeatState; i
   return (
     <li
       className={cn(
-        "flex gap-4 rounded-xl p-4 transition-colors duration-500 sm:flex-col sm:gap-3",
-        state === "listening" ? "bg-surface-container-lowest ring-1 ring-outline-variant/60" : "bg-surface-container-low",
+        "flex gap-4 border-t border-outline-variant/55 py-4 transition-[opacity,transform] duration-300 sm:flex-col sm:gap-3 sm:border-t-0 sm:py-0",
+        state === "listening" ? "opacity-100" : state === "stopped" ? "opacity-55" : "opacity-80",
       )}
     >
       <span
         aria-hidden
         className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-full text-label-lg transition-opacity duration-500",
-          style.chip,
+          "flex size-10 shrink-0 items-center justify-center rounded-full border text-label-lg transition-[background-color,border-color,opacity] duration-300",
+          state === "listening" ? cn(style.chip, "border-transparent") : "border-outline-variant bg-transparent text-on-surface-variant",
           state === "waiting" && "opacity-70",
         )}
       >

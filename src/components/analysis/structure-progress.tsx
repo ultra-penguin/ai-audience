@@ -54,7 +54,7 @@ export function StructureProgress({ status }: { status: AnalysisStatus }) {
         </h2>
         <p className="text-body-sm text-on-surface-variant">구간 {sections.length}개</p>
       </div>
-      <div className="overflow-hidden rounded-xl bg-surface-container-lowest ring-1 ring-outline-variant/40">
+      <div className="overflow-hidden border-y border-outline-variant/60">
         <table className="w-full border-collapse text-left">
           <caption className="sr-only">구간별 관중 진행 상황</caption>
           <thead>
@@ -133,12 +133,12 @@ export function InsightCards({ pipeline }: { pipeline: AnalysisPipeline }) {
         </h2>
         {total > MAX_INSIGHTS && <p className="text-body-sm text-on-surface-variant">최근 {MAX_INSIGHTS}개 · 전체 {total}개</p>}
       </div>
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid gap-x-8 sm:grid-cols-2">
         {insights.map((ins) => {
           const persona = ins.personaId ? personas.get(ins.personaId) : undefined;
           const section = ins.sectionId ? sections.get(ins.sectionId) : undefined;
           return (
-            <li key={ins.id} className="animate-rise-in space-y-2 rounded-xl bg-surface-container-low p-4 motion-reduce:animate-none">
+            <li key={ins.id} className="animate-rise-in space-y-2 border-t border-outline-variant/60 py-5 motion-reduce:animate-none">
               {(persona || section) && (
                 <p className="flex flex-wrap items-center gap-2">
                   {persona && <PersonaChip persona={persona} />}

@@ -7,7 +7,6 @@ import { useSubmitPresentation } from "@/features/presentation/queries";
 import { useRecorderStore } from "@/features/recording/recorder-store";
 import { MAX_RECORDING_MS, MIN_RECORDING_SEC, useMediaRecorder } from "@/features/recording/use-media-recorder";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import { isApiError } from "@/shared/api";
@@ -68,11 +67,15 @@ export function RecordingStudio() {
   };
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 md:px-8 md:py-14 lg:grid-cols-[1fr_18rem]">
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-headline-xl-mobile md:text-headline-xl text-on-surface">발표 녹음</h1>
-          <p className="text-body-lg text-on-surface-variant">평소 발표하듯 말해 주세요. 녹음을 마치면 가상 관중이 들을 수 있도록 올려드려요.</p>
+    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16 lg:px-10">
+      <div className="mx-auto max-w-4xl space-y-10">
+        <div className="flex flex-col justify-between gap-6 border-b border-outline-variant/60 pb-8 sm:flex-row sm:items-end">
+          <div className="space-y-3">
+            <p className="text-label-md text-primary">새 발표</p>
+            <h1 className="text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.035em] text-on-surface sm:text-[3.5rem]">발표할 준비가 되었나요?</h1>
+            <p className="max-w-xl text-body-lg text-on-surface-variant">평소 발표하듯 말해 주세요. 녹음을 마치면 가상 관중이 같은 발표를 들어요.</p>
+          </div>
+          <p className="max-w-[14rem] text-body-sm text-on-surface-variant sm:text-right">마이크 권한만 허용하면 바로 시작할 수 있어요.</p>
         </div>
 
         <div className="space-y-2">
@@ -86,12 +89,12 @@ export function RecordingStudio() {
             maxLength={80}
             placeholder="예: 동네 카페를 위한 수요 예측 도입 제안"
             disabled={submit.isPending}
-            className="h-11 w-full rounded-lg bg-surface-container-lowest px-3 text-body-lg text-on-surface ring-1 ring-outline-variant placeholder:text-on-surface-variant/70 focus-visible:ring-2 focus-visible:ring-primary-container focus-visible:outline-none disabled:opacity-60"
+            className="h-12 w-full rounded-xl border-b border-outline-variant/80 bg-transparent px-0 text-body-lg text-on-surface focus-visible:border-primary focus-visible:ring-0 focus-visible:outline-none disabled:opacity-60"
           />
         </div>
 
-        <Card className="p-5 sm:p-8">
-          <div className="flex flex-col items-center gap-5 text-center">
+        <section className="rounded-[2rem] bg-surface-container-low px-5 py-10 sm:px-10 sm:py-16">
+          <div className="flex flex-col items-center gap-7 text-center">
             <p role="status" className="flex items-center gap-2 text-label-lg text-on-surface">
               {status === "recording" && <span aria-hidden className="size-2.5 animate-pulse rounded-full bg-error" />}
               {status === "paused" && <span aria-hidden className="size-2.5 rounded-full bg-outline" />}
@@ -101,7 +104,7 @@ export function RecordingStudio() {
 
             <p
               className={cn(
-                "font-display text-[3.5rem] leading-none font-semibold tabular-nums tracking-tight sm:text-[4.5rem]",
+                "font-display text-[4.5rem] leading-none font-semibold tabular-nums tracking-[-0.06em] sm:text-[6.5rem]",
                 status === "paused" ? "text-on-surface-variant" : "text-on-surface",
               )}
               aria-label={`녹음 시간 ${formatDurationLong(elapsedMs / 1000)}`}
@@ -109,14 +112,14 @@ export function RecordingStudio() {
               {formatDuration(elapsedMs / 1000)}
             </p>
 
-            {status !== "stopped" && <LevelMeter level={level} active={status === "recording"} />}
+            {status !== "stopped" && <div className="w-full max-w-md"><LevelMeter level={level} active={status === "recording"} /></div>}
 
             {isLive && remainingMs < 60_000 && (
               <p className="text-body-sm text-on-surface-variant">최대 길이까지 {Math.ceil(remainingMs / 1000)}초 남았어요.</p>
             )}
 
             {(status === "idle" || status === "requesting") && (
-              <Button size="lg" onClick={start} disabled={status === "requesting"} className="min-w-44">
+              <Button size="lg" onClick={start} disabled={status === "requesting"} className="h-16 min-w-52 rounded-full px-8">
                 <Mic aria-hidden />
                 녹음 시작
               </Button>
@@ -190,22 +193,16 @@ export function RecordingStudio() {
               </div>
             )}
           </div>
-        </Card>
+        </section>
       </div>
 
-      <aside aria-labelledby="tips-title" className="space-y-4 lg:pt-24">
-        <h2 id="tips-title" className="text-headline-sm text-on-surface">녹음 전에</h2>
-        <ul className="space-y-3">
+      <aside aria-labelledby="tips-title" className="mx-auto mt-10 grid max-w-4xl gap-4 border-t border-outline-variant/60 pt-6 sm:grid-cols-3">
+        <h2 id="tips-title" className="text-label-lg text-on-surface">녹음 전에</h2>
+        <ul className="space-y-2 sm:col-span-2 sm:grid sm:grid-cols-3 sm:gap-5 sm:space-y-0">
           {TIPS.map((tip) => (
-            <li key={tip} className="flex gap-2 text-body-md text-on-surface-variant">
-              <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-primary-container" />
-              {tip}
-            </li>
+            <li key={tip} className="text-body-sm text-on-surface-variant">{tip}</li>
           ))}
         </ul>
-        <p className="rounded-lg bg-surface-container-low p-3 text-body-sm text-on-surface-variant">
-          녹음 중에는 피드백을 보여주지 않아요. 발표에만 집중하고, 끝난 뒤에 한 번에 확인하세요.
-        </p>
       </aside>
     </div>
   );

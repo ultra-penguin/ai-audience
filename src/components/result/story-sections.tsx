@@ -58,7 +58,7 @@ export function DiscoverySection({ result }: { result: AnalysisResult }) {
   const isPriority = difficult?.id === result.summary.priorityFixSectionId;
 
   return (
-    <section aria-labelledby="discovery-title" className="space-y-5 rounded-xl bg-surface-container-lowest p-5 ring-1 ring-outline-variant/50 sm:p-7">
+    <section aria-labelledby="discovery-title" className="space-y-6 border-y-2 border-primary py-8 sm:py-10">
       <div className="flex flex-wrap items-center gap-2">
         <h2 id="discovery-title" className="text-label-lg text-primary">
           가장 큰 발견
@@ -178,7 +178,7 @@ function Splits({ result }: { result: AnalysisResult }) {
       <h3 className="text-headline-sm text-on-surface">관중 반응이 갈린 곳</h3>
       <ul className="space-y-3">
         {splits.map(({ section, cells }) => (
-          <li key={section.id} className="space-y-3 rounded-xl bg-surface-container-low p-4 sm:p-5">
+          <li key={section.id} className="space-y-3 border-t border-outline-variant/60 py-5 first:border-t-0">
             <p className="flex flex-wrap items-baseline gap-2">
               <a href={`#${mapAnchor(section.id)}`} className="rounded text-label-lg text-on-surface underline-offset-4 hover:underline">
                 {section.title}
@@ -234,7 +234,7 @@ export function PresentationMapSection({ result, number }: { result: AnalysisRes
             <li
               key={s.id}
               id={mapAnchor(s.id)}
-              className="grid scroll-mt-24 grid-cols-[1.75rem_1fr] gap-3 rounded-xl p-3 target:bg-surface-container-low sm:p-4"
+              className="grid scroll-mt-24 grid-cols-[1.75rem_1fr] gap-3 border-t border-outline-variant/50 py-5 target:bg-surface-container-low sm:p-6"
             >
               <span aria-hidden className="flex size-7 items-center justify-center rounded-full bg-surface-container text-label-md tabular-nums text-on-surface-variant">
                 {i + 1}

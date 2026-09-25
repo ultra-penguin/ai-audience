@@ -14,10 +14,10 @@ export function LevelMeter({ level, active }: { level: number; active: boolean }
           <span
             key={i}
             className={cn(
-              "w-1.5 rounded-full transition-[height] duration-100",
+              "h-full w-1.5 origin-bottom rounded-full transition-transform duration-100",
               active ? (i % 3 === 1 ? "bg-secondary" : "bg-primary-container") : "bg-surface-container-highest",
             )}
-            style={{ height: `${Math.round(h * 100)}%` }}
+            style={{ transform: `scaleY(${h})` }}
           />
         );
       })}

@@ -97,9 +97,9 @@ export function ResultView({ id }: { id: string }) {
 
   return (
     <Container>
-      <header className="space-y-3">
-        <p className="text-label-md text-on-surface-variant">발표 리뷰 리포트</p>
-        <h1 className="text-headline-md md:text-headline-lg text-on-surface text-balance">{result.title}</h1>
+      <header className="space-y-4 border-b border-outline-variant/60 pb-10">
+        <p className="text-label-md text-primary">발표 리뷰 리포트</p>
+        <h1 className="max-w-3xl text-[2.75rem] font-semibold leading-[1.06] tracking-[-0.04em] text-on-surface text-balance sm:text-[4.25rem]">{result.title}</h1>
         <p className="text-body-md text-on-surface-variant">
           {formatDurationLong(result.durationSec)} · 관중 {result.personas.length}명이 들었어요
         </p>
@@ -136,7 +136,7 @@ export function ResultView({ id }: { id: string }) {
 }
 
 function Container({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-5xl space-y-12 px-4 py-10 md:px-8 md:py-14">{children}</div>;
+  return <div className="mx-auto max-w-7xl space-y-20 px-4 py-12 sm:px-6 md:py-16 lg:px-10">{children}</div>;
 }
 
 function ResultSkeleton() {

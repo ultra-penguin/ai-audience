@@ -17,11 +17,11 @@ export function ReportHeading({
   children?: ReactNode;
 }) {
   return (
-    <div className="space-y-2 border-t border-outline-variant/60 pt-6">
+    <div className="space-y-3 border-t border-outline-variant/60 pt-8">
       <p aria-hidden className="text-label-md tabular-nums text-primary">
         {String(number).padStart(2, "0")}
       </p>
-      <h2 id={id} className="text-headline-lg text-on-surface">
+      <h2 id={id} className="text-headline-xl text-on-surface">
         {title}
       </h2>
       {children && <p className="max-w-2xl text-body-md text-on-surface-variant">{children}</p>}

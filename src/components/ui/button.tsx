@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 
 /** shadcn-style button, restyled to DESIGN (4).md → Buttons. */
 export const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-label-lg transition-[background-color,color,transform] duration-150 select-none active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl text-label-lg transition-[background-color,color,transform,box-shadow] duration-150 select-none active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        primary: "bg-primary-container text-on-primary shadow-[0_1px_3px_rgba(24,24,27,0.06)] hover:bg-primary",
+        primary: "bg-primary-container text-on-primary shadow-[0_1px_2px_rgba(29,78,216,0.18)] hover:bg-primary hover:shadow-[0_3px_8px_rgba(29,78,216,0.18)]",
         secondary: "bg-surface-container text-on-surface hover:bg-surface-container-high",
-        outline: "bg-surface-container-lowest text-on-surface shadow-sm ring-1 ring-outline-variant/70 hover:bg-surface-container-low",
+        outline: "bg-transparent text-on-surface ring-1 ring-outline-variant/80 hover:bg-surface-container-low",
         ghost: "text-on-surface-variant hover:bg-surface-container hover:text-on-surface",
         danger: "bg-error text-on-error hover:bg-on-error-container",
       },

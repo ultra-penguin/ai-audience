@@ -1,85 +1,106 @@
-import { ArrowRight, Mic } from "lucide-react";
+import { ArrowDown, ArrowRight, Mic } from "lucide-react";
 import Link from "next/link";
 import { AudienceSeats } from "@/components/audience/audience-seats";
 import { FeedbackChain } from "@/components/result/feedback-chain";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { SAMPLE_RESULT } from "@/mocks/sample-result";
 
 const STEPS = [
-  { title: "발표를 녹음해요", body: "브라우저에서 마이크로 평소처럼 발표하세요. 중간에 일시정지할 수 있어요." },
-  { title: "가상 관중이 들어요", body: "비전공·일반·전문가 관중이 같은 발표를 각자의 시선으로 들어요." },
-  { title: "리포트로 확인해요", body: "한 줄 요약, 관중의 목소리, 막힌 문장, 바꿔 말하기 예시 순서로 읽어 내려가요." },
+  { title: "발표를 들려주세요", body: "실제 목소리로 평소처럼 발표하면 돼요." },
+  { title: "세 관중이 들어요", body: "배경지식이 다른 관중이 같은 발표를 각자의 시선으로 봅니다." },
+  { title: "막힌 곳을 발견해요", body: "어디서, 왜 이해가 끊겼는지 다음 문장까지 연결해 보여드려요." },
 ];
 
 export default function LandingPage() {
   const preview = SAMPLE_RESULT.difficultSections[0];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-8">
-      <section aria-labelledby="hero-title" className="grid gap-10 py-12 md:py-20 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-14">
-        <div className="space-y-6">
-          <p className="text-label-md text-on-surface-variant">발표 리허설 도구</p>
-          <h1 id="hero-title" className="text-display-lg-mobile md:text-display-lg text-balance text-on-surface">
-            실제 청중 앞에 서기 전에, 어디서 막히는지 먼저 들어보세요.
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+      <section aria-labelledby="hero-title" className="grid min-h-[calc(100svh-4.25rem)] items-center gap-16 py-16 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:gap-24 lg:py-20">
+        <div className="max-w-2xl space-y-8">
+          <h1 id="hero-title" className="max-w-xl text-[2.75rem] font-semibold leading-[1.06] tracking-[-0.04em] text-on-surface text-balance sm:text-[4.25rem]">
+            발표하기 전에,<br />
+            <span className="text-primary">관중에게 먼저</span><br />
+            들려보세요.
           </h1>
-          <p className="max-w-xl text-body-xl text-on-surface-variant">
-            발표를 녹음하면 서로 다른 AI 관중이 이해가 끊기는 지점을 짚고, 왜 그런지와 어떻게 고치면 되는지 알려드려요.
+          <p className="max-w-lg text-body-xl text-on-surface-variant">
+            실제 발표를 녹음하면 서로 다른 AI 관중이 어디서 이해하고, 어디서 멈췄는지 알려드려요.
           </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
             <Link href="/record" className={buttonVariants({ size: "lg" })}>
               <Mic aria-hidden />
-              발표 녹음 시작
+              발표 시작하기
             </Link>
-            <Link href="/result/sample" className={buttonVariants({ variant: "outline", size: "lg" })}>
-              샘플 결과 먼저 보기
-              <ArrowRight aria-hidden />
+            <Link href="#how-title" className="inline-flex items-center gap-2 rounded text-label-lg text-on-surface-variant underline-offset-4 hover:text-on-surface hover:underline">
+              어떻게 듣는지 보기
+              <ArrowDown aria-hidden className="size-4" />
             </Link>
           </div>
-          <p className="text-body-sm text-on-surface-variant">계정 없이 바로 쓸 수 있어요. 음성만 사용하며 영상은 녹화하지 않아요.</p>
+          <p className="text-body-sm text-on-surface-variant">계정 없이 시작 · 음성만 사용 · 영상은 녹화하지 않아요</p>
         </div>
 
-        <Card className="p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <p className="text-label-lg text-on-surface">이런 피드백을 받아요</p>
-            <span className="rounded bg-surface-container px-2 py-0.5 text-label-sm text-on-surface-variant">샘플</span>
+        <div className="relative border-y border-outline-variant/60 py-8 sm:py-12">
+          <div className="mb-8 flex items-center gap-3 text-label-md text-on-surface-variant">
+            <span className="size-2 rounded-full bg-primary" />
+            <span>발표가 관중에게 도착하는 순간</span>
+            <span aria-hidden className="h-px flex-1 bg-outline-variant/70" />
           </div>
-          <FeedbackChain section={preview} personas={SAMPLE_RESULT.personas} compact />
-        </Card>
-      </section>
-
-      <section aria-labelledby="how-title" className="border-t border-outline-variant/50 py-12 md:py-16">
-        <h2 id="how-title" className="text-headline-lg text-on-surface">이렇게 진행돼요</h2>
-        <ol className="mt-8 grid gap-6 md:grid-cols-3">
-          {STEPS.map((step, i) => (
-            <li key={step.title} className="space-y-2">
-              <span className="text-label-md text-primary">0{i + 1}</span>
-              <h3 className="text-headline-sm text-on-surface">{step.title}</h3>
-              <p className="text-body-md text-on-surface-variant">{step.body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section aria-labelledby="audience-title" className="border-t border-outline-variant/50 py-12 md:py-16">
-        <div className="max-w-2xl space-y-3">
-          <h2 id="audience-title" className="text-headline-lg text-on-surface">세 관중, 세 가지 시선</h2>
-          <p className="text-body-lg text-on-surface-variant">
-            점수 대신 관중의 입장에서 들은 그대로를 보여드려요. 어느 한 관중이 기준이 되지 않도록, 배경지식이 다른 세 관중이 같은 발표를 함께 들어요.
-          </p>
+          <AudienceSeats className="[&>div:first-child]:hidden" />
+          <div className="mt-8 flex items-center gap-3 text-label-md text-on-surface-variant">
+            <span aria-hidden className="h-px w-12 bg-outline-variant/70" />
+            <ArrowRight aria-hidden className="size-4 text-primary" />
+            <span>관중의 반응이 리포트가 됩니다</span>
+          </div>
+          <div className="mt-6 max-w-md border-l-2 border-primary pl-5">
+            <p className="text-label-md text-on-surface-variant">샘플 발견</p>
+            <p className="mt-2 text-headline-sm text-on-surface">“여기서 핵심 개념의 설명이 부족했어요.”</p>
+          </div>
         </div>
-        <AudienceSeats className="mt-8" />
       </section>
 
-      <section className="border-t border-outline-variant/50 py-12 md:py-16">
-        <div className="flex flex-col items-start gap-5 rounded-xl bg-surface-container-low p-6 md:flex-row md:items-center md:justify-between md:p-8">
-          <div className="space-y-1">
-            <h2 className="text-headline-md text-on-surface">5분이면 첫 리허설을 해볼 수 있어요</h2>
-            <p className="text-body-md text-on-surface-variant">조용한 곳에서 마이크 권한만 허용해 주세요.</p>
+      <section id="how-title" aria-labelledby="how-heading" className="scroll-mt-24 border-t border-outline-variant/60 py-20 md:py-28">
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-24">
+          <div>
+            <h2 id="how-heading" className="max-w-sm text-headline-xl text-on-surface">복잡한 분석을<br />간단한 흐름으로.</h2>
+          </div>
+          <ol className="divide-y divide-outline-variant/60 border-y border-outline-variant/60">
+            {STEPS.map((step, index) => (
+              <li key={step.title} className="grid gap-3 py-6 sm:grid-cols-[3rem_1fr] sm:gap-5">
+                <span className="text-label-md tabular-nums text-primary">{String(index + 1).padStart(2, "0")}</span>
+                <div className="space-y-1.5">
+                  <h3 className="text-headline-sm text-on-surface">{step.title}</h3>
+                  <p className="max-w-xl text-body-md text-on-surface-variant">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section aria-labelledby="audience-title" className="border-t border-outline-variant/60 py-20 md:py-28">
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-24">
+          <div className="space-y-3">
+            <h2 id="audience-title" className="text-headline-xl text-on-surface">한 명의 기준으로<br />판단하지 않아요.</h2>
+            <p className="max-w-sm text-body-lg text-on-surface-variant">비전공자, 일반 관중, 전문가가 같은 발표를 다르게 받아들이는 지점을 비교합니다.</p>
+          </div>
+          <div className="space-y-8">
+            <AudienceSeats className="[&>div:first-child]:hidden" />
+            <div className="max-w-xl border-t border-outline-variant/60 pt-6">
+              <FeedbackChain section={preview} personas={SAMPLE_RESULT.personas} compact />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-outline-variant/60 py-20 md:py-28">
+        <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
+          <div className="space-y-3">
+            <h2 className="text-headline-xl text-on-surface">다음 발표는<br />더 잘 전달되도록.</h2>
+            <p className="text-body-lg text-on-surface-variant">첫 리허설은 몇 분이면 충분해요.</p>
           </div>
           <Link href="/record" className={buttonVariants({ size: "lg" })}>
             <Mic aria-hidden />
-            녹음하러 가기
+            녹음 시작하기
           </Link>
         </div>
       </section>

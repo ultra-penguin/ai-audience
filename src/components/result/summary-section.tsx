@@ -22,9 +22,9 @@ export function SummarySection({ result }: { result: AnalysisResult }) {
       <h2 id="summary-title" className="sr-only">
         한눈에 보기
       </h2>
-      <p className="max-w-3xl text-headline-lg md:text-headline-xl text-on-surface text-pretty">{summary.headline}</p>
+      <p className="max-w-4xl text-[2rem] font-medium leading-[1.16] tracking-[-0.025em] text-on-surface text-pretty sm:text-[3rem]">{summary.headline}</p>
 
-      <div className="grid gap-x-10 gap-y-6 border-y border-outline-variant/60 py-6 md:grid-cols-2">
+      <div className="grid gap-x-10 gap-y-8 border-y border-outline-variant/60 py-8 md:grid-cols-2">
         <div className="space-y-2">
           <p className="text-label-md text-on-surface-variant">핵심 메시지</p>
           {keyMessage && <p className="text-body-lg text-on-surface">“{keyMessage}”</p>}
