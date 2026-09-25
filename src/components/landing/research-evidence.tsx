@@ -1,33 +1,36 @@
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { EvidenceMetric } from "./evidence-metric";
+import { Reveal } from "./reveal";
 import { SectionIntro } from "./section-intro";
 
 type Source = { authors: string; year: number; title: string; venue: string; href: string };
 
 /** Research finding and our reading of it are always visually separate. */
-function ResearchCard({ label, claim, children, source, interpretation }: { label: string; claim: string; children: ReactNode; source: Source; interpretation: string }) {
+function ResearchCard({ label, claim, children, source, interpretation, delayMs = 0 }: { label: string; claim: string; children: ReactNode; source: Source; interpretation: string; delayMs?: number }) {
   return (
-    <article className="flex flex-col gap-5 border-t border-on-surface/80 pt-5">
-      <div className="space-y-2">
-        <p className="text-label-md text-on-surface-variant">{label}</p>
-        <h3 className="text-headline-md text-on-surface text-pretty">{claim}</h3>
-      </div>
-      {children}
-      <p className="text-label-md text-on-surface-variant">
-        <span className="mr-1.5 rounded-sm bg-surface-container px-1.5 py-0.5 text-label-sm text-on-surface">연구</span>
-        {source.authors} ({source.year}). {source.title}. <i>{source.venue}</i>.{" "}
-        <a href={source.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 rounded text-primary underline-offset-4 hover:underline">
-          원문
-          <ExternalLink aria-hidden className="size-3" />
-          <span className="sr-only">(새 창)</span>
-        </a>
-      </p>
-      <p className="mt-auto border-l-2 border-primary pl-3 text-body-md text-on-surface">
-        <span className="block text-label-md text-primary">우리의 해석</span>
-        {interpretation}
-      </p>
-    </article>
+    <Reveal delayMs={delayMs} className="h-full">
+      <article className="flex h-full flex-col gap-4 border-t border-on-surface/80 pt-5">
+        <div className="space-y-2">
+          <p className="text-label-md text-on-surface-variant">{label}</p>
+          <h3 className="text-headline-md text-on-surface text-pretty break-keep">{claim}</h3>
+        </div>
+        {children}
+        <p className="text-label-md text-on-surface-variant [overflow-wrap:anywhere]">
+          <span className="mr-1.5 rounded-sm bg-surface-container px-1.5 py-0.5 text-label-sm text-on-surface">연구</span>
+          {source.authors} ({source.year}). {source.title}. <i>{source.venue}</i>.{" "}
+          <a href={source.href} target="_blank" rel="noopener noreferrer" className="-my-3 inline-flex items-center gap-0.5 rounded py-3 text-primary underline-offset-4 hover:underline">
+            원문
+            <ExternalLink aria-hidden className="size-3" />
+            <span className="sr-only">(새 창)</span>
+          </a>
+        </p>
+        <p className="mt-auto border-l-2 border-primary pl-3 text-body-md text-on-surface break-keep">
+          <span className="block text-label-md text-primary">우리의 해석</span>
+          {interpretation}
+        </p>
+      </article>
+    </Reveal>
   );
 }
 
@@ -54,11 +57,11 @@ const DELIVERY_FACTORS = ["명확성", "속도", "목소리", "청중과의 상�
 
 export function ResearchEvidence() {
   return (
-    <section aria-labelledby="research-title" className="space-y-10 border-t border-outline-variant/60 py-16 md:py-24">
+    <section aria-labelledby="research-title" className="space-y-8 border-t border-outline-variant/60 py-14 md:space-y-10 md:py-20">
       <SectionIntro id="research-title" eyebrow="연구 근거" title="청중의 반응은 측정할 수 있습니다.">
         이해·전달·집중은 연구에서도 따로 관찰되는 신호예요. 아래 수치는 외부 연구 결과이며, 이 서비스 AI의 성능이 아닙니다.
       </SectionIntro>
-      <div className="grid gap-10 md:grid-cols-3 md:gap-8">
+      <div className="grid gap-10 md:grid-cols-3 md:gap-6 lg:gap-8">
         <ResearchCard
           label="A · 발표 이해도"
           claim="청중의 이해도는 측정 가능한 신호입니다."
@@ -76,6 +79,7 @@ export function ResearchEvidence() {
 
         <ResearchCard
           label="B · 발표 전달"
+          delayMs={90}
           claim="좋은 발표는 내용만의 문제가 아닙니다."
           source={{
             authors: "Estrada, Patel, Talente & Kraemer",
@@ -100,6 +104,7 @@ export function ResearchEvidence() {
 
         <ResearchCard
           label="C · 청중 집중"
+          delayMs={180}
           claim="청중의 집중은 발표 내내 동일하지 않습니다."
           source={{
             authors: "Bunce, Flens & Neiles",
