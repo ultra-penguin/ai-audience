@@ -8,7 +8,7 @@ import { useResultUiStore } from "@/features/result/result-ui-store";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isApiError, isNotFoundError } from "@/shared/api";
+import { isApiError, isNotFoundError, type AnalysisResult } from "@/shared/api";
 import { cn, formatDurationLong } from "@/lib/utils";
 import { biggestDiscovery, mapSections } from "@/features/result/story";
 import { KeyMoments, NaturalQuestionsSection } from "./audience-moments";
@@ -84,7 +84,23 @@ export function ResultView({ id }: { id: string }) {
     );
   }
 
-  const result = query.data;
+  return <ResultReport result={query.data} />;
+}
+
+/**
+ * The report itself, rendered from an already-loaded result. `notice` replaces the
+ * default sample-data label and `closing` replaces the "record again" footer, so other
+ * entry points (the exhibition demo) reuse the same report without fetching.
+ */
+export function ResultReport({
+  result,
+  notice,
+  closing,
+}: {
+  result: AnalysisResult;
+  notice?: React.ReactNode;
+  closing?: React.ReactNode;
+}) {
   // Chapters after the opening insight; optional ones drop out without leaving gaps in the numbering.
   const hasFixes = result.difficultSections.length > 0;
   const hasSuggestions = result.missingExplanations.length > 0 || result.exampleSuggestions.length > 0;
@@ -110,11 +126,12 @@ export function ResultView({ id }: { id: string }) {
         </div>
       </header>
 
-      {result.isSample && (
-        <Notice title="샘플 결과예요">
-          실제 녹음 내용을 분석한 것이 아니라, 화면 구성을 보여드리기 위한 예시 데이터예요.
-        </Notice>
-      )}
+      {notice ??
+        (result.isSample && (
+          <Notice title="샘플 결과예요">
+            실제 녹음 내용을 분석한 것이 아니라, 화면 구성을 보여드리기 위한 예시 데이터예요.
+          </Notice>
+        ))}
 
       {/* First screen: what happened, the biggest discovery and how each listener took it, side by side. */}
       <div className="space-y-6">
@@ -136,17 +153,19 @@ export function ResultView({ id }: { id: string }) {
       {questionsNo > 0 && <NaturalQuestionsSection result={result} number={questionsNo} />}
       <TranscriptSection result={result} />
 
-      <section aria-labelledby="next-title" className="flex flex-col items-start gap-4 rounded-xl bg-surface-container-low p-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <h2 id="next-title" className="text-headline-sm text-on-surface">
-            고친 뒤 다시 들어보기
-          </h2>
-          <p className="text-body-md text-on-surface-variant">먼저 고칠 곳 하나만 바꿔서 다시 녹음해 보세요.</p>
-        </div>
-        <Link href="/record" className={buttonVariants()}>
-          <Mic aria-hidden />새 녹음 시작
-        </Link>
-      </section>
+      {closing ?? (
+        <section aria-labelledby="next-title" className="flex flex-col items-start gap-4 rounded-xl bg-surface-container-low p-6 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h2 id="next-title" className="text-headline-sm text-on-surface">
+              고친 뒤 다시 들어보기
+            </h2>
+            <p className="text-body-md text-on-surface-variant">먼저 고칠 곳 하나만 바꿔서 다시 녹음해 보세요.</p>
+          </div>
+          <Link href="/record" className={buttonVariants()}>
+            <Mic aria-hidden />새 녹음 시작
+          </Link>
+        </section>
+      )}
     </Container>
   );
 }
