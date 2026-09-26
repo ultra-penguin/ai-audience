@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, shouldRetryQuery, type AnalysisStage, type CreatePresentationRequest } from "@/shared/api";
 import { createMockClient } from "@/mocks/mock-client";
+import { createDemoClient, isExhibitionDemoId } from "@/features/demo";
 
 export const presentationKeys = {
   all: ["presentations"] as const,
@@ -14,8 +15,10 @@ const TERMINAL_STAGES: AnalysisStage[] = ["completed", "failed"];
 const POLL_INTERVAL_MS = 1500;
 const DEMO_IDS = new Set(["sample", "demo-script", "demo-empty", "demo-failed", "demo-legacy"]);
 const demoApi = createMockClient();
+/** Exhibition demos are served offline from the catalog in every API mode. */
+const exhibitionApi = createDemoClient();
 const isDemoId = (id: string) => DEMO_IDS.has(id) || id.startsWith("demo-script-");
-const clientFor = (id: string) => (isDemoId(id) ? demoApi : api);
+const clientFor = (id: string) => (isExhibitionDemoId(id) ? exhibitionApi : isDemoId(id) ? demoApi : api);
 
 /** Upload the recording, then kick off analysis. Resolves with the presentation id. */
 export function useSubmitPresentation() {
