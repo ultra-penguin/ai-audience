@@ -6,6 +6,8 @@ import { safeDecode } from "@/lib/utils";
 
 type Props = { params: Promise<{ demoId: string }> };
 
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   return EXHIBITION_DEMO_IDS.map((demoId) => ({ demoId }));
 }
