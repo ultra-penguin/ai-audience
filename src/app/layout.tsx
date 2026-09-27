@@ -4,13 +4,34 @@ import { pretendard } from "@/lib/fonts";
 import { Providers } from "./providers";
 import "./globals.css";
 
+const SITE_NAME = "AI 가상 관중 발표 리뷰어";
+const SITE_DESCRIPTION =
+  "발표를 녹음하면 서로 다른 AI 관중이 어디서 이해가 막히는지, 왜 막히는지, 어떻게 고치면 되는지 알려드려요.";
+
+/** Optional public origin for absolute OG URLs; without it Next falls back to the deployment URL. */
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
 export const metadata: Metadata = {
+  ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
+  applicationName: SITE_NAME,
   title: {
-    default: "AI 가상 관중 발표 리뷰어",
-    template: "%s · AI 가상 관중 발표 리뷰어",
+    default: SITE_NAME,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "발표를 녹음하면 서로 다른 AI 관중이 어디서 이해가 막히는지, 왜 막히는지, 어떻게 고치면 되는지 알려드려요.",
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -21,13 +42,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ko" className={pretendard.variable}>
       <body className="flex min-h-dvh flex-col">
-        <div
-          hidden
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{
-            __html: "<!-- THESIS: AI 관중의 판단을 조용한 리포트로 읽게 하며 SaaS 대시보드 관습을 거부한다. OWN-WORLD: 쿨그레이 종이, 검은 활자, 한 가지 블루 액션과 얇은 규칙선. STORY: 발표를 시작하고, 관중의 반응을 발견하고, 한 문장을 고친다. FIRST VIEWPORT: 큰 한국어 헤드라인과 발표→관중→발견 흐름이 먼저 보인다. FORM: 운영 화면 안의 편집형 리포트, seed 1061b666. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md -->",
-          }}
-        />
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-surface-container-lowest focus:px-4 focus:py-2 focus:text-label-lg focus:shadow-md"

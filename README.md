@@ -18,6 +18,10 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 | `/analyzing/[id]` | Polls pipeline stages. With optional `status.pipeline` detail it shows structure → section → persona → cross-check, a persona × section grid, the current section/persona and insight cards — only what the backend reports. Without it the Phase 3 stage list is used. Demo ids: `demo-failed`, `demo-legacy` |
 | `/result/[id]` | Report: opening insight → biggest discovery + presentation map/heatmap/audience splits (only when `discovery`/`presentationMap`/`audienceHeatmap` exist) → persona voices → difficult-section reader (select/highlight) → fixes with before/after rewrites → missing explanations/examples |
 
+## Deployment metadata
+
+Set `NEXT_PUBLIC_SITE_URL` (e.g. `https://example.com`) so Open Graph/Twitter image URLs are absolute. Without it Next.js falls back to the Vercel deployment URL, or `http://localhost:3000` elsewhere.
+
 ## Frontend API layer
 
 - Contract: `src/shared/api/types.ts` (Zod schemas + endpoint payloads).
