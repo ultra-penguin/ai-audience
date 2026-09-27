@@ -1,58 +1,82 @@
-# AI 가상 관중 발표 리뷰어
+# AI Audience
 
-Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · TanStack Query · Zustand · Zod.
-Product brief: `PRODUCT.md`; visual tokens: `DESIGN (4).md`.
+발표하기 전에, 서로 다른 AI 관중에게 먼저 들려보세요. AI Audience는 비전공자·일반 관중·전문가 관점에서 발표의 이해가 막힌 지점과 개선 방향을 보여줍니다.
 
-```bash
-pnpm install
-pnpm dev        # http://localhost:3000
-pnpm typecheck && pnpm lint && pnpm test && pnpm build
-```
+## Features
+
+- 오프라인 전시 Demo 3종: BFS, AI 윤리, 학교 프로젝트
+- Persona 기반 관중 시뮬레이션과 반응 비교
+- 발표 구조·Transcript·근거 구간을 연결한 리뷰 리포트
+- 브라우저 음성 녹음과 실제 STT/LLM 분석 Pipeline
+
+## Demo
+
+`/exhibition`에서 Demo를 선택하세요. 전시 Demo는 미리 준비된 데이터만 사용하므로 외부 AI API나 Secret 없이도 선택부터 결과까지 실행됩니다.
 
 ## Routes
 
 | Route | Purpose |
 |---|---|
-| `/` | Landing + sample feedback preview |
-| `/record` | MediaRecorder recording: start / pause / resume / finish, playback, upload |
-| `/analyzing/[id]` | Polls pipeline stages. With optional `status.pipeline` detail it shows structure → section → persona → cross-check, a persona × section grid, the current section/persona and insight cards — only what the backend reports. Without it the Phase 3 stage list is used. Demo ids: `demo-failed`, `demo-legacy` |
-| `/result/[id]` | Report: opening insight → biggest discovery + presentation map/heatmap/audience splits (only when `discovery`/`presentationMap`/`audienceHeatmap` exist) → persona voices → difficult-section reader (select/highlight) → fixes with before/after rewrites → missing explanations/examples |
+| `/` | 서비스 소개 및 시작 |
+| `/exhibition` | 전시용 Demo 선택 |
+| `/exhibition/demo-bfs` | BFS Demo 소개·시뮬레이션 |
+| `/exhibition/demo-ai-ethics` | AI 윤리 Demo 소개·시뮬레이션 |
+| `/exhibition/demo-recycling` | 학교 프로젝트 Demo 소개·시뮬레이션 |
+| `/record` | 실제 발표 녹음 |
+| `/analyzing/[id]` | 실제 분석 진행 상태 |
+| `/result/[id]` | 실제 분석 결과 리포트 |
 
-## Deployment metadata
+## Tech Stack
 
-Set `NEXT_PUBLIC_SITE_URL` (e.g. `https://example.com`) so Open Graph/Twitter image URLs are absolute. Without it Next.js falls back to the Vercel deployment URL, or `http://localhost:3000` elsewhere.
+Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · TanStack Query · Zustand · Zod.
 
-## Frontend API layer
+## Local Development
 
-- Contract: `src/shared/api/types.ts` (Zod schemas + endpoint payloads).
-- `src/shared/api/index.ts` picks mock by default; `NEXT_PUBLIC_API_MODE=http` plus `NEXT_PUBLIC_API_BASE_URL` switches to HTTP.
-- Components use `src/features/presentation/queries.ts` rather than calling endpoints directly.
-- Mock results are explicitly labelled as sample data and include demo empty/failure states.
+```bash
+pnpm install
+pnpm dev        # http://localhost:3000
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+```
 
-## Backend API
+## Environment Variables
 
-`POST /api/presentations` accepts multipart audio (WebM, Ogg, WAV, MP3, M4A, or MP4; up to 25 MB) and returns an uploaded presentation.
+```bash
+cp .env.example .env.local
+```
 
-`POST /api/presentations/:id/analyze` starts asynchronous analysis. Poll `GET /api/presentations/:id/status` until complete, then call `GET /api/presentations/:id/result`.
+전시 Demo는 `NEXT_PUBLIC_API_MODE=mock` 기본값으로 동작합니다. 실제 발표 분석을 사용하려면 서버 전용 `GROQ_API_KEY`와 `STT_PROVIDER=groq`, `LLM_PROVIDER=groq`를 배포 환경에 등록하세요. `.env.local`과 Secret은 Git에 커밋하지 않습니다.
 
-Errors use `{ "error": { "code": "...", "message": "...", "details": ... } }` where details are present.
+`NEXT_PUBLIC_SITE_URL`에는 배포된 HTTPS origin을 넣어 Open Graph/Twitter URL을 절대 경로로 만드세요.
 
-### Analysis providers
+## Architecture
 
-The backend keeps `MockPresentationAnalysisProvider` as the development fallback. By default Phase 2 is configured for Groq's OpenAI-compatible API: `openai/gpt-oss-120b` for persona analysis and multilingual `whisper-large-v3-turbo` for speech-to-text. Set one server-only `GROQ_API_KEY` to enable both; if it is missing, local development safely stays in mock mode. `STT_PROVIDER` and `LLM_PROVIDER` accept `groq`, `openai`, or `openai-compatible`. `STT_BASE_URL`, `LLM_BASE_URL`, `STT_MODEL`, `LLM_MODEL`, `LLM_REASONING_EFFORT`, and `ANALYSIS_TIMEOUT_MS` are optional server-only overrides.
+```text
+Exhibition Demo → Offline Demo Catalog → Shared Result UI
+Real Recording → Upload API → STT → Persona LLM → Validated Result UI
+```
 
-Required server-only variables for real analysis:
+실제 발표 데이터와 업로드 파일은 현재 MVP의 in-memory 저장소를 사용하며 서버 재시작 시 사라집니다. 전시 Demo는 이 저장소와 독립적으로 정적 번들 데이터에서 실행됩니다.
 
-- `STT_PROVIDER=groq`, `LLM_PROVIDER=groq`
-- `GROQ_API_KEY` (or separate `STT_API_KEY` and `LLM_API_KEY`)
+## Real Analysis API
 
-The upload repository retains audio bytes in memory for STT while exposing only safe audio metadata through API responses. A restart discards bytes and all presentation data, consistent with the MVP storage limitation. Real analysis always uses exactly three fixed perspectives: 비전공 관중, 일반 관중, 전문가 관중; each raw LLM response is Zod-validated and malformed JSON is retried once. Groq documents `whisper-large-v3-turbo` as multilingual and exposes a free-tier upload limit, but its published price is $0.04/hour; it is not an unlimited zero-cost model.
+실제 녹음 모드는 다음 API 흐름을 사용합니다.
 
-## Storage note
+- `POST /api/presentations` — 음성 업로드
+- `POST /api/presentations/{id}/analyze` — 분석 시작
+- `GET /api/presentations/{id}/status` — 단계별 상태 조회
+- `GET /api/presentations/{id}/result` — 검증된 결과 조회
 
-The MVP uses an in-memory presentation repository so the frontend can be integrated without a database or object store. Data and upload metadata are lost on restart and are not suitable for multi-instance production deployment; durable storage is a follow-up.
+Groq를 사용할 때는 서버 전용 `GROQ_API_KEY`를 설정합니다. STT는 `whisper-large-v3-turbo`, Persona/통합 분석은 `openai/gpt-oss-120b`를 기본값으로 사용하며, 키가 없으면 Mock Provider로 안전하게 동작합니다.
 
-## State
+## CI
 
-- Zustand: recording UI state and result persona filter.
-- TanStack Query: upload/start mutation, status polling, and result retrieval.
+GitHub Actions는 push와 pull request마다 install → typecheck → lint → test → build를 실행합니다.
+
+## License
+
+프로젝트 정책에 따라 별도 라이선스를 적용하세요.
+
+Product brief: `PRODUCT.md`; visual tokens: `DESIGN (4).md`.
