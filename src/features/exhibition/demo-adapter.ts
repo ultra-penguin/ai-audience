@@ -1,18 +1,18 @@
 import { AnalysisResultSchema, type AnalysisResult, type HeatmapCell, type MapSection, type Persona } from "@/shared/api/types";
 import { heatmapIndex, mapSections } from "@/features/result/story";
-import { FALLBACK_DEMOS } from "./fallback-demos";
+import { DEMO_CATALOG, DEMO_IDS, isExhibitionDemoId as isCatalogDemoId } from "@/features/demo";
+import type { DemoId, ExhibitionDemo as CatalogDemo } from "@/features/demo";
 
 /**
  * Narrow contract between exhibition demo data and the exhibition UI.
  *
- * The UI only reads `ExhibitionDemo`. Its data source is `FALLBACK_DEMOS` until the
- * data worker's `demo-catalog.ts` (DEMO_CATALOG / getExhibitionDemo) lands; at that
- * point only `SOURCES` below changes. Everything the simulation shows is derived from
- * the shared `AnalysisResult`, so the screen can never claim something the report doesn't.
+ * The UI only reads `ExhibitionDemo`. Its source is the central offline catalog;
+ * everything the simulation shows is derived from the shared `AnalysisResult`, so
+ * the screen can never claim something the report doesn't.
  */
 
-export const EXHIBITION_DEMO_IDS = ["bfs", "ai-ethics", "school-project"] as const;
-export type ExhibitionDemoId = (typeof EXHIBITION_DEMO_IDS)[number];
+export const EXHIBITION_DEMO_IDS = DEMO_IDS;
+export type ExhibitionDemoId = DemoId;
 
 /** What a data source must supply for one demo. */
 export type ExhibitionDemoSource = {
@@ -45,10 +45,26 @@ export type ExhibitionDemo = ExhibitionDemoSource & {
   focusIndex: number;
 };
 
-const SOURCES: readonly ExhibitionDemoSource[] = FALLBACK_DEMOS;
+function sourceFromCatalog(demo: CatalogDemo): ExhibitionDemoSource {
+  const excerpt = demo.result.transcript?.segments[0]?.text ?? demo.result.transcript?.text ?? demo.teaser;
+  return {
+    id: demo.id,
+    title: demo.result.title,
+    tagline: demo.teaser,
+    context: {
+      speaker: "학생 발표자",
+      situation: demo.audience,
+      audience: "서로 다른 배경지식과 관심사를 가진 AI 관중 3명",
+      excerpt,
+    },
+    result: demo.result,
+  };
+}
+
+const SOURCES: readonly ExhibitionDemoSource[] = DEMO_CATALOG.map(sourceFromCatalog);
 
 export function isExhibitionDemoId(id: string): id is ExhibitionDemoId {
-  return (EXHIBITION_DEMO_IDS as readonly string[]).includes(id);
+  return isCatalogDemoId(id);
 }
 
 function toDemo(source: ExhibitionDemoSource): ExhibitionDemo {

@@ -20,13 +20,13 @@ const params = (demoId: string) => ({ params: Promise.resolve({ demoId }) });
 describe("exhibition routes", () => {
   it("offers three demos, each linking to its own stage, plus a real-presentation CTA", () => {
     const html = renderToStaticMarkup(<DemoPicker demos={listExhibitionDemos()} />);
-    for (const id of ["bfs", "ai-ethics", "school-project"]) expect(html).toContain(`href="/exhibition/${id}"`);
+    for (const id of ["demo-bfs", "demo-ai-ethics", "demo-recycling"]) expect(html).toContain(`href="/exhibition/${id}"`);
     expect(html).toContain('href="/record"');
     expect(html).toContain("내 발표로 해보기");
   });
 
   it("opens a demo on its context preview with a start action and a way back", () => {
-    const html = renderToStaticMarkup(<DemoStage demoId="bfs" />);
+    const html = renderToStaticMarkup(<DemoStage demoId="demo-bfs" />);
     expect(html).toContain("발표 맥락");
     expect(html).toContain("시뮬레이션 시작");
     expect(html).toContain('href="/exhibition"');
@@ -34,11 +34,11 @@ describe("exhibition routes", () => {
   });
 
   it("renders the shared report with exhibition exits instead of the record-again footer", () => {
-    const html = renderToStaticMarkup(<ExhibitionResult demoId="ai-ethics" />);
+    const html = renderToStaticMarkup(<ExhibitionResult demoId="demo-ai-ethics" />);
     expect(html).toContain("발표 리뷰 리포트");
-    expect(html).toContain("채용 AI, 공정하다고 말할 수 있을까");
+    expect(html).toContain("생성형 AI, 편리함 뒤에 남는 책임");
     expect(html).toContain("전시용 예시 리포트예요");
-    expect(html).toContain('href="/exhibition/ai-ethics"');
+    expect(html).toContain('href="/exhibition/demo-ai-ethics"');
     expect(html).toContain('href="/record"');
     expect(html).not.toContain("새 녹음 시작");
   });

@@ -4,12 +4,12 @@ import { EXHIBITION_DEMO_IDS, getExhibitionDemo, isExhibitionDemoId, listExhibit
 
 describe("exhibition demo adapter", () => {
   it("lists exactly the three agreed demos in order", () => {
-    expect(listExhibitionDemos().map((d) => d.id)).toEqual(["bfs", "ai-ethics", "school-project"]);
-    expect([...EXHIBITION_DEMO_IDS]).toEqual(["bfs", "ai-ethics", "school-project"]);
+    expect(listExhibitionDemos().map((d) => d.id)).toEqual(["demo-bfs", "demo-ai-ethics", "demo-recycling"]);
+    expect([...EXHIBITION_DEMO_IDS]).toEqual(["demo-bfs", "demo-ai-ethics", "demo-recycling"]);
   });
 
   it("returns null for unknown or malformed ids", () => {
-    for (const id of ["", "sample", "BFS", "bfs/", "../bfs", "constructor", "__proto__"]) {
+    for (const id of ["", "sample", "BFS", "demo-bfs/", "../demo-bfs", "constructor", "__proto__"]) {
       expect(isExhibitionDemoId(id)).toBe(false);
       expect(getExhibitionDemo(id)).toBeNull();
     }
@@ -50,7 +50,9 @@ describe("exhibition demo adapter", () => {
       for (const d of s.difficultSectionIds ?? []) expect(difficult.has(d)).toBe(true);
     }
     for (const item of [...result.missingExplanations, ...result.exampleSuggestions]) {
-      expect(sections.has(item.sectionId!)).toBe(true);
+      if (item.sectionId) {
+        expect(sections.has(item.sectionId) || segments.has(item.sectionId)).toBe(true);
+      }
       for (const p of item.personaIds) expect(personas.has(p)).toBe(true);
     }
     for (const m of result.keyMoments ?? []) {

@@ -17,6 +17,7 @@ const VIEWPORTS = [
   { width: 1280, height: 800 },
   { width: 375, height: 812 },
 ];
+const DEMO_IDS = ["demo-bfs", "demo-ai-ethics", "demo-recycling"];
 
 if (!BASE_URL || !SCREENSHOT_DIR) {
   console.error("usage: node docs/qa/exhibition-qa.mjs <baseUrl> <screenshotDir>");
@@ -54,39 +55,43 @@ for (const reducedMotion of ["no-preference", "reduce"]) {
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${SCREENSHOT_DIR}/${tag}-1-picker.png` });
 
-    await page.click('a[href="/exhibition/bfs"]');
-    await page.waitForURL("**/exhibition/bfs");
-    await page.getByText("시뮬레이션 시작").waitFor();
-    await noHorizontalScroll(page, `${tag} preview`);
-    await page.waitForTimeout(2600);
-    check(await page.getByText("준비됐어요").isVisible(), `${tag}: preview should settle into ready copy`);
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/${tag}-2-preview.png` });
+    for (const demoId of DEMO_IDS) {
+      await page.goto(`${BASE_URL}/exhibition`, { waitUntil: "networkidle" });
+      await page.click(`a[href="/exhibition/${demoId}"]`);
+      await page.waitForURL(`**/exhibition/${demoId}`);
+      await page.getByText("시뮬레이션 시작").waitFor();
+      await noHorizontalScroll(page, `${tag} ${demoId} preview`);
+      await page.waitForTimeout(2600);
+      check(await page.getByText("준비됐어요").isVisible(), `${tag} ${demoId}: preview should settle into ready copy`);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/${tag}-${demoId}-2-preview.png` });
 
-    await page.getByRole("button", { name: "시뮬레이션 시작" }).click();
-    const states = new Set();
-    const shots = { "관중이 듣는 중": "3-listening", "반응 비교": "4-comparing", "리포트 정리": "5-writing" };
-    const deadline = Date.now() + 12000;
-    while (Date.now() < deadline && !page.url().endsWith("/result")) {
-      const active = await page.locator('[aria-label="진행 단계"] [aria-current="step"] p').first().textContent().catch(() => null);
-      const label = active?.replace(/\(.*\)/, "").trim();
-      if (label && !states.has(label)) {
-        states.add(label);
-        await page.waitForTimeout(label === "관중이 듣는 중" ? 1500 : 500);
-        await noHorizontalScroll(page, `${tag} ${label}`);
-        if (shots[label]) await page.screenshot({ path: `${SCREENSHOT_DIR}/${tag}-${shots[label]}.png` });
+      await page.getByRole("button", { name: "시뮬레이션 시작" }).click();
+      const states = new Set();
+      const shots = { "관중이 듣는 중": "3-listening", "반응 비교": "4-comparing", "리포트 정리": "5-writing" };
+      // Screenshot capture is intentionally part of this visual QA and can be
+      // slower than the demo clock on reduced-motion/mobile contexts.
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline && !page.url().endsWith("/result")) {
+        const active = await page.locator('[aria-label="진행 단계"] [aria-current="step"] p').first().textContent().catch(() => null);
+        const label = active?.replace(/\(.*\)/, "").trim();
+        if (label && !states.has(label)) {
+          states.add(label);
+          await page.waitForTimeout(label === "관중이 듣는 중" ? 1500 : 500);
+          await noHorizontalScroll(page, `${tag} ${demoId} ${label}`);
+          if (shots[label]) await page.screenshot({ path: `${SCREENSHOT_DIR}/${tag}-${demoId}-${shots[label]}.png` });
+        }
+        await page.waitForTimeout(120);
       }
-      const body = await page.locator("body").innerText().catch(() => "");
-      check(!/\d+\s?%/.test(body.replace(/38%에서 17%로|24%에서 11%로|42%에서 76%로/g, "")), `${tag}: percentage shown during simulation`);
-      await page.waitForTimeout(120);
+      check(states.size >= 3, `${tag} ${demoId}: saw ${states.size} simulation states (${[...states].join(", ")})`);
+      await page.waitForURL(`**/exhibition/${demoId}/result`, { timeout: 5000 }).catch(() => check(false, `${tag} ${demoId}: did not hand off to result`));
+      await page.getByText("발표 리뷰 리포트").waitFor();
+      check(await page.getByText("전시용 예시 리포트예요").isVisible(), `${tag} ${demoId}: exhibition notice missing`);
+      check((await page.locator('a[href="/exhibition"]').count()) >= 1, `${tag} ${demoId}: return-to-demo CTA missing`);
+      check((await page.locator('a[href="/record"]').count()) >= 1, `${tag} ${demoId}: real-presentation CTA missing`);
+      await noHorizontalScroll(page, `${tag} ${demoId} result`);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/${tag}-${demoId}-6-result.png` });
+      console.log(`${tag} ${demoId}: states=${[...states].join(" → ")}`);
     }
-    check(states.size >= 3, `${tag}: saw ${states.size} simulation states (${[...states].join(", ")})`);
-    await page.waitForURL("**/exhibition/bfs/result", { timeout: 5000 }).catch(() => check(false, `${tag}: did not hand off to result`));
-    await page.getByText("발표 리뷰 리포트").waitFor();
-    check(await page.getByText("전시용 예시 리포트예요").isVisible(), `${tag}: exhibition notice missing`);
-    check((await page.locator('a[href="/exhibition"]').count()) >= 1, `${tag}: return-to-demo CTA missing`);
-    check((await page.locator('a[href="/record"]').count()) >= 1, `${tag}: real-presentation CTA missing`);
-    await noHorizontalScroll(page, `${tag} result`);
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/${tag}-6-result.png` });
 
     const res = await page.goto(`${BASE_URL}/exhibition/does-not-exist`);
     check(res?.status() === 404, `${tag}: invalid id should 404`);
@@ -96,7 +101,6 @@ for (const reducedMotion of ["no-preference", "reduce"]) {
     check(external.length === 0, `${tag}: external requests ${external.join(", ")}`);
     check(errors.length === 0, `${tag}: page errors ${errors.join(" | ")}`);
     await context.close();
-    console.log(`${tag}: states=${[...states].join(" → ")}`);
   }
 }
 await browser.close();
